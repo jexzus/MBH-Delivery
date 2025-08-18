@@ -1,0 +1,226 @@
+﻿@page "/registro"
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.AuthService Auth
+
+<h2 class="mb-3">Registro de Cliente</h2>
+
+<div class="login-page" style="max-width:720px; margin-left:auto; margin-right:auto;">
+    <EditForm EditContext="_editContext">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-2">
+            <label class="form-label">Nombre de usuario</label>
+            <InputText class="form-control" @bind-Value="_vm.NombreUsuario" />
+            <ValidationMessage For="@(() => _vm.NombreUsuario)" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Contraseña</label>
+            <input type="password" class="form-control" @bind="_vm.Contrasena" />
+            <small class="text-muted">Debe contener letras y números (solo caracteres alfanuméricos).</small>
+            <ValidationMessage For="@(() => _vm.Contrasena)" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Nombre</label>
+            <InputText class="form-control" @bind-Value="_vm.Nombre" />
+            <ValidationMessage For="@(() => _vm.Nombre)" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Apellido</label>
+            <InputText class="form-control" @bind-Value="_vm.Apellido" />
+            <ValidationMessage For="@(() => _vm.Apellido)" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Número de teléfono</label>
+            <InputText class="form-control" @bind-Value="_vm.NumTelefono"
+                       oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+            <ValidationMessage For="@(() => _vm.NumTelefono)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Domicilio</label>
+            <InputText class="form-control" @bind-Value="_vm.Domicilio" />
+            <ValidationMessage For="@(() => _vm.Domicilio)" />
+        </div>
+
+        <div class="d-grid gap-2" style="max-width:520px; margin: 0 auto;">
+            <button type="button" class="btn btn-gradient-green btn-full" @onclick="AbrirConfirmacion">
+                Registrarse
+            </button>
+            <button type="button" class="btn btn-gradient-red btn-full" @onclick="VolverLogin">
+                Volver al login
+            </button>
+        </div>
+    </EditForm>
+</div>
+
+@* ---------- Modal de confirmación ---------- *@
+@if (_confirmAbierto)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarConfirmacion"></div>
+    <div class="modal-custom" role="dialog" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Confirmar registro</h5>
+        </div>
+        <div class="modal-body">
+            <p>¿Crear una cuenta de cliente con los siguientes datos?</p>
+            <ul style="margin:0; padding-left:1rem">
+                <li><strong>Usuario:</strong> @_vm.NombreUsuario</li>
+                <li><strong>Nombre:</strong> @_vm.Nombre @_vm.Apellido</li>
+                <li><strong>Teléfono:</strong> @_vm.NumTelefono</li>
+                <li><strong>Domicilio:</strong> @_vm.Domicilio</li>
+            </ul>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="alert alert-danger mt-2">@_error</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarConfirmacion" disabled="@_trabajando">
+                No, cancelar
+            </button>
+            <button class="btn btn-pill btn-grad-confirmar" @onclick="ConfirmarRegistroAsync" disabled="@_trabajando">
+                @(_trabajando ? "Enviando..." : "Sí, registrar")
+            </button>
+        </div>
+    </div>
+}
+
+@* ---------- Toast ---------- *@
+@if (_mostrarToast)
+{
+    <div class="app-toast">
+        <div class="app-toast-body">
+            <div class="app-toast-title">Éxito</div>
+            @_toastText
+        </div>
+        <button class="app-toast-close" @onclick="CerrarToast">×</button>
+    </div>
+}
+
+@code {
+    // ===== VM con validaciones de DataAnnotations =====
+    private class RegistroVm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El usuario es obligatorio.")]
+        [System.ComponentModel.DataAnnotations.MinLength(3, ErrorMessage = "Mínimo 3 caracteres.")]
+        public string NombreUsuario { get; set; } = string.Empty;
+
+        // Alfanumérica y debe contener al menos 1 letra y 1 número
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "La contraseña es obligatoria.")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]+$",
+            ErrorMessage = "Debe contener letras y números (solo alfanumérica).")]
+        public string Contrasena { get; set; } = string.Empty;
+
+        // Solo letras (con espacios y acentos)
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$",
+            ErrorMessage = "Solo letras.")]
+        public string Nombre { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$",
+            ErrorMessage = "Solo letras.")]
+        public string Apellido { get; set; } = string.Empty;
+
+        // Solo números
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^\d+$",
+            ErrorMessage = "Solo números.")]
+        public string NumTelefono { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El domicilio es obligatorio.")]
+        public string Domicilio { get; set; } = string.Empty;
+    }
+
+    private readonly RegistroVm _vm = new();
+    private EditContext _editContext = default!;
+
+    private bool _confirmAbierto;
+    private bool _trabajando;
+    private string? _error;
+
+    private bool _mostrarToast;
+    private string _toastText = "OK";
+    private System.Timers.Timer? _toastTimer;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_vm);
+    }
+
+    private void AbrirConfirmacion()
+    {
+        _error = null;
+        if (_editContext.Validate())
+            _confirmAbierto = true;
+    }
+
+    private void CerrarConfirmacion()
+    {
+        _confirmAbierto = false;
+        _error = null;
+        _trabajando = false;
+    }
+
+    private async Task ConfirmarRegistroAsync()
+    {
+        _trabajando = true;
+
+        var dto = new MauiBlazorDelivery.Services.RegistroClienteDto
+        {
+            NombreUsuario = _vm.NombreUsuario.Trim(),
+            Contrasena = _vm.Contrasena.Trim(),
+            Nombre = _vm.Nombre.Trim(),
+            Apellido = _vm.Apellido.Trim(),
+            NumTelefono = _vm.NumTelefono.Trim(),
+            Domicilio = _vm.Domicilio.Trim()
+        };
+
+        var (ok, error) = await Auth.RegistrarClienteAsync(dto);
+        _trabajando = false;
+
+        if (ok)
+        {
+            CerrarConfirmacion();
+            MostrarToast("Registro realizado correctamente.");
+            // pequeño delay para que se vea el toast y volvemos al login
+            await Task.Delay(1400);
+            VolverLogin();
+        }
+        else
+        {
+            _error = string.IsNullOrWhiteSpace(error) ? "No se pudo registrar." : error;
+        }
+    }
+
+    private void VolverLogin() => Nav.NavigateTo("/login", true);
+
+    // ===== Toast reutilizado =====
+    private void MostrarToast(string texto)
+    {
+        _toastText = texto;
+        _mostrarToast = true;
+        StateHasChanged();
+
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(2200) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) =>
+        {
+            _mostrarToast = false;
+            InvokeAsync(StateHasChanged);
+        };
+        _toastTimer.Start();
+    }
+    private void CerrarToast()
+    {
+        _mostrarToast = false;
+        _toastTimer?.Stop();
+        StateHasChanged();
+    }
+}

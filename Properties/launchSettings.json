@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "WebApiDelivery": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://0.0.0.0:7189;http://0.0.0.0:5000;https://localhost:7189;http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

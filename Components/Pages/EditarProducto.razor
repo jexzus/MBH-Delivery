@@ -1,0 +1,390 @@
+﻿    @page "/admin/producto/editar/{Id:int}"
+    @page "/editarproducto/{Id:int}"
+
+    @using System.Globalization
+    @using System.Net.Http.Headers
+    @using System.Net.Http.Json
+    @using Microsoft.AspNetCore.Components.Forms
+
+    @inject HttpClient Http
+    @inject NavigationManager Nav
+    @inject MauiBlazorDelivery.Services.AuthService Auth
+
+    <h2 class="mb-3">Editar Producto</h2>
+
+    @if (!string.IsNullOrEmpty(MensajeOk))
+    {
+        <div class="alert alert-success">@MensajeOk</div>
+    }
+    @if (!string.IsNullOrEmpty(MensajeError))
+    {
+        <div class="alert alert-danger">@MensajeError</div>
+    }
+
+    @if (Cargando)
+    {
+        <p>Cargando...</p>
+    }
+    else
+    {
+        <!-- Confirmamos antes de guardar -->
+        <EditForm class="edit-page" Model="Model" OnValidSubmit="ConfirmarAntesDeGuardar">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+
+            <!-- Nombre -->
+            <div class="mb-3">
+                <label class="form-label">Nombre</label>
+                <InputText class="form-control" @bind-Value="Model.NombreProducto" />
+                <ValidationMessage For="@(() => Model.NombreProducto)" />
+            </div>
+
+            <!-- Descripción -->
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                <InputTextArea class="form-control" @bind-Value="Model.Descripcion" />
+                <ValidationMessage For="@(() => Model.Descripcion)" />
+            </div>
+
+            <!-- Precio -->
+            <div class="mb-3">
+                <label class="form-label">Precio</label>
+                <InputNumber class="form-control" @bind-Value="Model.Precio" step="0.01" />
+                <ValidationMessage For="@(() => Model.Precio)" />
+                <small class="text-muted">Valor actual: @Model.Precio?.ToString("F2")</small>
+            </div>
+
+            <!-- Imagen actual -->
+            @if (!string.IsNullOrWhiteSpace(ImagenActualUrl))
+            {
+                <div class="mb-3">
+                    <label class="form-label">Imagen actual</label><br />
+                    <img src="@ImagenActualUrl" alt="Imagen actual" class="img-thumbnail" style="max-height:150px" />
+                </div>
+            }
+
+            <!-- Cambiar imagen -->
+            <div class="mb-3">
+                <label class="form-label">Cambiar imagen (opcional)</label>
+
+                <!-- input file oculto + label como botón -->
+                <InputFile id="fileImagen"
+                           class="file-input-hidden"
+                           OnChange="OnFileSelected"
+                           accept=".jpg,.jpeg,.png,.gif,.webp" />
+                <label for="fileImagen" class="btn btn-pill btn-grad-file">Elegir archivo</label>
+                <span class="ms-2 align-middle">@TextoArchivoSeleccionado</span>
+
+                <ValidationMessage For="@(() => ArchivoImagen)" />
+                @if (!string.IsNullOrEmpty(PreviewDataUrl))
+                {
+                    <img src="@PreviewDataUrl" class="img-thumbnail mt-2" style="max-height:150px" />
+                }
+            </div>
+
+            <!-- Acciones -->
+            <div class="mt-4 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-pill btn-grad-guardar" disabled="@Guardando">Guardar cambios</button>
+                <button type="button" class="btn btn-pill btn-grad-cancelar" @onclick="Cancelar">Cancelar</button>
+            </div>
+
+            <!-- Cerrar sesión -->
+            <div class="mt-5">
+                <button type="button" class="btn btn-gradient-red" @onclick="CerrarSesion">Cerrar sesión</button>
+         
+
+            </div>
+
+
+        </EditForm>
+
+
+    }
+
+
+    <!-- Modal de confirmación (sin JS de Bootstrap) -->
+    @if (MostrarConfirmacion)
+    {
+        <div class="modal-backdrop-custom" @onclick="CerrarModal"></div>
+        <div class="modal-custom">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar guardado</h5>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro que quieres guardar los cambios?</p>
+                <small class="text-muted d-block">Precio a guardar: @Model.Precio?.ToString("F2")</small>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarModal">No, cancelar</button>
+                <button class="btn btn-pill btn-grad-confirmar" @onclick="GuardarYVolverAsync">Sí, confirmar</button>
+            </div>
+        </div>
+    }
+
+    <style>
+        .modal-backdrop-custom {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 1040;
+        }
+
+        .modal-custom {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%,-50%);
+            background: #fff;
+            border-radius: .5rem;
+            padding: 1rem;
+            width: min(420px,92vw);
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            z-index: 1050;
+        }
+
+        .modal-header {
+            border-bottom: 1px solid #eee;
+            margin-bottom: .5rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: .5rem;
+            justify-content: flex-end;
+            margin-top: .75rem;
+        }
+    </style>
+
+    @code {
+        // -------- Parámetro --------
+        [Parameter] public int Id { get; set; }
+
+        // -------- VM --------
+        public class ProductoEditVm
+        {
+            public int IdProducto { get; set; }
+            [System.ComponentModel.DataAnnotations.Required] public string? NombreProducto { get; set; }
+            [System.ComponentModel.DataAnnotations.Required] public string? Descripcion { get; set; }
+            [System.ComponentModel.DataAnnotations.Range(0.01, double.MaxValue)] public decimal? Precio { get; set; }
+            public string? Imagen { get; set; }
+        }
+
+        // -------- Estado --------
+        private ProductoEditVm Model = new();
+        private bool Cargando = true;
+        private bool Guardando = false;
+        private bool MostrarConfirmacion = false;
+        private string? MensajeOk;
+        private string? MensajeError;
+        private string? ImagenActualUrl;
+        private string? PreviewDataUrl;
+        private IBrowserFile? ArchivoImagen;
+
+        // nuevo: nombre del archivo elegido
+        private string NombreArchivoSeleccionado = string.Empty;
+
+        // Texto seguro para el span (evita el CS1662 en Razor)
+        private string TextoArchivoSeleccionado =>
+            string.IsNullOrWhiteSpace(NombreArchivoSeleccionado)
+                ? "No se eligió ningún archivo"
+                : NombreArchivoSeleccionado;
+
+        // -------- Helpers --------
+        private string ConstruirImagenUrl(string? nombreArchivo)
+        {
+            if (string.IsNullOrWhiteSpace(nombreArchivo)) return "";
+            var baseUrl = Http.BaseAddress?.ToString() ?? "";
+            if (!baseUrl.EndsWith("/")) baseUrl += "/";
+            return $"{baseUrl}imagenes/{nombreArchivo}";
+        }
+
+        // -------- Ciclo de vida --------
+        protected override async Task OnInitializedAsync()
+        {
+            try
+            {
+                var prod = await Http.GetFromJsonAsync<ProductoEditVm>($"api/producto/{Id}");
+                if (prod is null)
+                {
+                    MensajeError = "Producto no encontrado.";
+                    return;
+                }
+
+                Model = prod;
+                ImagenActualUrl = ConstruirImagenUrl(prod.Imagen);
+                Console.WriteLine($"[CLIENT] Producto cargado - Precio: {Model.Precio}");
+            }
+            catch (Exception ex)
+            {
+                MensajeError = $"Error al cargar el producto: {ex.Message}";
+            }
+            finally
+            {
+                Cargando = false;
+            }
+        }
+
+        // -------- Eventos UI --------
+        private async Task OnFileSelected(InputFileChangeEventArgs e)
+        {
+            try
+            {
+                var f = e?.File;
+                if (f is null)
+                {
+                    // Nada seleccionado o evento inválido
+                    MensajeError = "No se eligió ningún archivo.";
+                    ArchivoImagen = null;
+                    PreviewDataUrl = null;
+                    NombreArchivoSeleccionado = string.Empty;
+                    StateHasChanged();
+                    return;
+                }
+
+                ArchivoImagen = f;
+                NombreArchivoSeleccionado = f.Name;
+
+                const long maxBytes = 4 * 1024 * 1024; // 4 MB
+                await using var stream = f.OpenReadStream(maxBytes);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+
+                // f ya no es null
+                PreviewDataUrl = $"data:{f.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+            }
+            catch (Exception ex)
+            {
+                MensajeError = $"No se pudo leer la imagen: {ex.Message}";
+                ArchivoImagen = null;
+                PreviewDataUrl = null;
+                NombreArchivoSeleccionado = string.Empty;
+            }
+            StateHasChanged();
+        }
+
+
+        private void ConfirmarAntesDeGuardar(EditContext _)
+        {
+            MostrarConfirmacion = true;
+            StateHasChanged();
+        }
+
+        private void CerrarModal()
+        {
+            MostrarConfirmacion = false;
+            StateHasChanged();
+        }
+
+        private async Task GuardarYVolverAsync()
+        {
+            CerrarModal();
+            var ok = await GuardarInternoAsync();
+            if (ok) Nav.NavigateTo("/gestioncatalogo?ok=1");
+        }
+
+        // -------- Guardado --------
+        private async Task<bool> GuardarInternoAsync()
+        {
+            if (Guardando) return false;
+
+            MensajeOk = MensajeError = null;
+            Guardando = true;
+
+            try
+            {
+                HttpResponseMessage resp;
+
+                Console.WriteLine($"[CLIENT] Antes de enviar - Precio en Model: {Model.Precio}");
+                Console.WriteLine($"[CLIENT] Tiene imagen: {ArchivoImagen != null}");
+
+                if (ArchivoImagen is null)
+                {
+                    // Sin imagen: JSON
+                    var payload = new
+                    {
+                        IdProducto = Model.IdProducto,
+                        NombreProducto = Model.NombreProducto ?? "",
+                        Descripcion = Model.Descripcion ?? "",
+                        Precio = Model.Precio ?? 0m,
+                        Imagen = Model.Imagen
+                    };
+
+                    Console.WriteLine($"[CLIENT] JSON Payload - Precio: {payload.Precio}");
+                    resp = await Http.PutAsJsonAsync($"api/producto/{Id}", payload);
+                }
+                else
+                {
+                    // Con imagen: multipart/form-data
+                    using var form = new MultipartFormDataContent();
+
+                    var precioValue = Model.Precio ?? 0m;
+                    var precioString = precioValue.ToString("F2", CultureInfo.GetCultureInfo("es-AR"));
+
+                    Console.WriteLine($"[CLIENT] Multipart - Precio decimal: {precioValue}");
+                    Console.WriteLine($"[CLIENT] Multipart - Precio string (es-AR): '{precioString}'");
+
+                    form.Add(new StringContent(Model.IdProducto.ToString()), "IdProducto");
+                    form.Add(new StringContent(Model.NombreProducto ?? ""), "NombreProducto");
+                    form.Add(new StringContent(Model.Descripcion ?? ""), "Descripcion");
+                    form.Add(new StringContent(precioString), "Precio");
+
+                    var f = ArchivoImagen; // local
+                    var stream = f!.OpenReadStream(4 * 1024 * 1024);
+                    var fileName = Path.GetFileName(f.Name);
+                    if (string.IsNullOrWhiteSpace(fileName)) fileName = "upload.jpg";
+
+                    var fileContent = new StreamContent(stream);
+                    fileContent.Headers.ContentType = new MediaTypeHeaderValue(f.ContentType);
+                    form.Add(fileContent, "ImagenArchivo", fileName);
+
+                    Console.WriteLine($"[CLIENT] PUT -> {Http.BaseAddress}api/producto/{Id}/con-imagen");
+                    Console.WriteLine($"[CLIENT] Archivo: {fileName}, Tamaño: {f.Size / 1024.0:F1} KB");
+
+                    resp = await Http.PutAsync($"api/producto/{Id}/con-imagen", form);
+                }
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var detalle = await resp.Content.ReadAsStringAsync();
+                    MensajeError = $"No se pudo guardar. Código {resp.StatusCode}. {detalle}";
+                    Console.WriteLine($"[CLIENT] Error response: {detalle}");
+                    return false;
+                }
+
+                var actualizado = await resp.Content.ReadFromJsonAsync<ProductoEditVm>();
+                if (actualizado is not null)
+                {
+                    Console.WriteLine($"[CLIENT] Respuesta del servidor - Precio: {actualizado.Precio}");
+                    Model = actualizado;
+                    ImagenActualUrl = ConstruirImagenUrl(actualizado.Imagen);
+                    PreviewDataUrl = null;
+                    ArchivoImagen = null;
+                    NombreArchivoSeleccionado = string.Empty;
+                }
+
+                MensajeOk = "Producto actualizado correctamente.";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MensajeError = $"Error al guardar: {ex.Message}";
+                Console.WriteLine($"[CLIENT] Exception: {ex}");
+                return false;
+            }
+            finally
+            {
+                Guardando = false;
+                StateHasChanged();
+            }
+        }
+
+        // -------- Navegación --------
+        private void Cancelar() => Nav.NavigateTo("/gestioncatalogo");
+
+        private void CerrarSesion()
+        {
+            Auth.Logout();
+            Nav.NavigateTo("/login", true);
+        }
+    }

@@ -1,0 +1,21 @@
+﻿@* /Components/Layout/NavMenu.razor *@
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.AuthService Auth
+
+<nav class="nav-menu">
+    <ul>
+        @* Dejamos solo lo que quieras visible siempre *@
+        @*<li><NavLink href="/about" Match="NavLinkMatch.All">About</NavLink></li> (acá podríamos poner un about y redireccionar a pagina about us)*@
+
+        @* Ejemplo: enlaces según rol (opcional) *@
+        @if (Auth.EstaLogueado && Auth.EsAdmin)
+        {
+            @*<li><NavLink href="/paneladmin">Panel Admin</NavLink></li>
+            <li><NavLink href="/gestioncatalogo">Gestión Catálogo</NavLink></li>*@
+        }
+        
+
+        @* IMPORTANTE: NO mostrar “Login” ni “Registro” en el menú *@
+    </ul>
+</nav>

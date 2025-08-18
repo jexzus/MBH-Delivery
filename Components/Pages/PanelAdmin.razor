@@ -1,0 +1,45 @@
+﻿@page "/paneladmin"
+@inject NavigationManager NavigationManager
+@inject MauiBlazorDelivery.Services.AuthService AuthService
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Si no está logueado o no es admin → volver a login
+        if (!AuthService.EstaLogueado || !AuthService.EsAdmin)
+            NavigationManager.NavigateTo("/login");
+    }
+
+    string NombreUsuario => AuthService.UsuarioActual?.NombreUsuario ?? "Admin";
+
+    void IrGestionCatalogo() => NavigationManager.NavigateTo("/gestioncatalogo");
+    void IrGestionPedidos() => NavigationManager.NavigateTo("/gestionpedidos");
+    void IrGestionAdmins() => NavigationManager.NavigateTo("/gestionadministradores");
+    void CerrarSesion()
+    {
+        AuthService.Logout();
+        NavigationManager.NavigateTo("/login", true);
+    }
+}
+
+<div class="admin-panel">
+    <h2 class="admin-title">Bienvenido <span class="admin-name">@NombreUsuario</span></h2>
+
+    <div class="admin-actions">
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionCatalogo">
+            Gestión de catálogo
+        </button>
+
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionPedidos">
+            Gestión de pedidos
+        </button>
+
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionAdmins">
+            Gestión de administradores
+        </button>
+    </div>
+
+    <button type="button" class="btn btn-gradient-red admin-logout" @onclick="CerrarSesion">
+        Cerrar sesión
+    </button>
+</div>

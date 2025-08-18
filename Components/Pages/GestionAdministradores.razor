@@ -1,0 +1,444 @@
+﻿@page "/gestionadministradores"
+@inject MauiBlazorDelivery.Services.AuthService Auth
+@inject MauiBlazorDelivery.Services.AdminService AdminSvc
+@inject NavigationManager Nav
+
+<h2 class="mb-3">Gestión de Administradores</h2>
+
+@if (!string.IsNullOrEmpty(OkMsg))
+{
+    <div class="alert alert-success">@OkMsg</div>
+}
+@if (!string.IsNullOrEmpty(ErrorMsg))
+{
+    <div class="alert alert-danger">@ErrorMsg</div>
+}
+
+@if (Cargando)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <!-- CREAR NUEVO (con confirmación) -->
+    <form class="edit-page" @onsubmit="AbrirConfirmCrear" @onsubmit:preventDefault>
+        <h5 class="mt-2">Crear Nuevo Administrador</h5>
+
+        <div class="mb-2">
+            <label class="form-label">NombreUsuario</label>
+            <InputText class="form-control" @bind-Value="NuevoNombre" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Contraseña</label>
+            <InputText class="form-control" @bind-Value="NuevaPass" type="password" />
+        </div>
+
+        <div class="d-flex flex-column gap-2">
+            <!-- Botón grande como cerrar sesión -->
+            <button type="submit" class="btn btn-gradient-orange btn-full">Crear Administrador</button>
+        </div>
+    </form>
+
+    <hr class="my-4" />
+
+    <h5 class="mb-2">Administradores actuales</h5>
+
+    @if (Admins is null || Admins.Count == 0)
+    {
+        <div class="alert alert-info">No hay administradores registrados.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th style="min-width:200px">Usuario</th>
+                        <th style="min-width:220px">Contraseña</th>
+                        <th style="width:260px">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Admins)
+                    {
+                        var enEdicion = EditandoId == a.Id;
+                        <tr>
+                            <td>
+                                @if (enEdicion)
+                                {
+                                    <InputText class="form-control" @bind-Value="a.NombreUsuario" />
+                                }
+                                else
+                                {
+                                    <input class="form-control" value="@a.NombreUsuario" disabled />
+                                }
+                            </td>
+                            <td>
+                                @if (enEdicion)
+                                {
+                                    <InputText class="form-control" @bind-Value="a.Contraseña" type="text" />
+                                }
+                                else
+                                {
+                                    <input class="form-control" value="@a.Contraseña" disabled />
+                                }
+                            </td>
+                            <td class="d-flex gap-2">
+                                @if (enEdicion)
+                                {
+                                    <button class="btn btn-gradient-green" @onclick="() => GuardarFilaAsync(a)">Guardar</button>
+                                    <button class="btn btn-gradient-orange" @onclick="() => CancelarEdicion(a)">Cancelar</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-edit-orange" @onclick="() => Editar(a)">Editar</button>
+                                    <button class="btn btn-gradient-red" @onclick="() => ConfirmarEliminar(a)">Eliminar</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <!-- Botones inferiores: Volver + Cerrar sesión (mismo tamaño) -->
+    <div class="catalog-footer-actions footer-safe-pad">
+        <button class="btn btn-gradient-orange btn-full" @onclick="VolverPanel">
+            Volver al panel de administrador
+        </button>
+
+        <button class="btn btn-gradient-red btn-full" @onclick="CerrarSesion">
+            Cerrar sesión
+        </button>
+    </div>
+}
+
+@* ------- Modal confirmar CREAR ------- *@
+@if (MostrarConfirmacionCrear)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarModalCrear"></div>
+    <div class="modal-custom">
+        <div class="modal-header">
+            <h5 class="modal-title">Confirmar creación</h5>
+        </div>
+        <div class="modal-body">
+            <p>¿Estás seguro de crear al administrador <strong>@NuevoNombre</strong>?</p>
+            @if (!string.IsNullOrEmpty(ErrorMsgCrear))
+            {
+                <div class="alert alert-danger mt-2">@ErrorMsgCrear</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarModalCrear">No, cancelar</button>
+            <button class="btn btn-pill btn-grad-confirmar" @onclick="CrearAdminConfirmadoAsync">Sí, crear</button>
+        </div>
+    </div>
+}
+
+@* ------- Modal confirmar ELIMINAR ------- *@
+@if (MostrarConfirmacionEliminar)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarModalEliminar"></div>
+    <div class="modal-custom">
+        <div class="modal-header">
+            <h5 class="modal-title">Confirmar eliminación</h5>
+        </div>
+        <div class="modal-body">
+            <p>¿Eliminar al administrador <strong>@AdminAEliminar?.NombreUsuario</strong>?</p>
+            @if (!string.IsNullOrEmpty(ErrorMsgEliminar))
+            {
+                <div class="alert alert-danger mt-2">@ErrorMsgEliminar</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarModalEliminar">No, cancelar</button>
+            <button class="btn btn-pill btn-grad-confirmar" @onclick="EliminarConfirmadoAsync">Sí, eliminar</button>
+        </div>
+    </div>
+}
+
+@* ------- Toast (usa tu CSS global de .app-toast) ------- *@
+@if (_mostrarToast)
+{
+    <div class="app-toast">
+        <div class="app-toast-body">
+            <div class="app-toast-title">Éxito</div>
+            @_toastText
+        </div>
+        <button class="app-toast-close" @onclick="CerrarToast">×</button>
+    </div>
+}
+
+<style>
+    /* === Modal: centrado, por encima de todo y con texto visible === */
+    .modal-backdrop-custom {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 3000;
+    }
+
+    .modal-custom {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%,-50%);
+        background: #fff;
+        border-radius: .5rem;
+        padding: 1rem;
+        width: min(420px,92vw);
+        box-shadow: 0 10px 30px rgba(0,0,0,.25);
+        z-index: 3001;
+        /* FIX: evita que herede color blanco/transparente y se vea “vacío” */
+        color: #212529;
+    }
+
+        .modal-custom * {
+            color: #212529;
+        }
+
+    .modal-header {
+        border-bottom: 1px solid #eee;
+        margin-bottom: .5rem;
+    }
+
+    .modal-footer {
+        display: flex;
+        gap: .5rem;
+        justify-content: flex-end;
+        margin-top: .75rem;
+    }
+
+    /* Botones grandes (mismo ancho para todos los destacados) */
+    .btn-full {
+        width: 100%;
+        padding: .9rem 1rem;
+        border-radius: 9999px;
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    private bool Cargando = true;
+    private string? OkMsg;
+    private string? ErrorMsg;
+
+    // Crear nuevo
+    private string NuevoNombre = string.Empty;
+    private string NuevaPass = string.Empty;
+
+    // Listado y edición
+    private List<MauiBlazorDelivery.Services.AdminService.AdminDto> Admins = new();
+    private int? EditandoId = null;
+    private MauiBlazorDelivery.Services.AdminService.AdminDto? BackupEdicion;
+
+    // Confirmaciones
+    private bool MostrarConfirmacionCrear = false;
+    private string? ErrorMsgCrear;
+    private bool MostrarConfirmacionEliminar = false;
+    private MauiBlazorDelivery.Services.AdminService.AdminDto? AdminAEliminar;
+    private string? ErrorMsgEliminar;
+
+    // Toast
+    private bool _mostrarToast;
+    private string _toastText = "Operación exitosa.";
+    private System.Timers.Timer? _toastTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.EstaLogueado || !Auth.EsAdmin)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        try
+        {
+            Cargando = true;
+            OkMsg = ErrorMsg = null;
+            Admins = await AdminSvc.GetAdminsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = $"No se pudieron cargar los administradores: {ex.Message}";
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            Cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    /* ===== Crear con confirmación + toast ===== */
+    private void AbrirConfirmCrear()
+    {
+        ErrorMsgCrear = null;
+        if (string.IsNullOrWhiteSpace(NuevoNombre) || string.IsNullOrWhiteSpace(NuevaPass))
+        {
+            ErrorMsg = "Completá usuario y contraseña.";
+            return;
+        }
+        MostrarConfirmacionCrear = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalCrear()
+    {
+        MostrarConfirmacionCrear = false;
+        ErrorMsgCrear = null;
+        StateHasChanged();
+    }
+
+    private async Task CrearAdminConfirmadoAsync()
+    {
+        try
+        {
+            OkMsg = ErrorMsg = null;
+            ErrorMsgCrear = null;
+
+            var ok = await AdminSvc.CrearAsync(new(NuevoNombre.Trim(), NuevaPass.Trim()));
+            if (ok)
+            {
+                MostrarConfirmacionCrear = false;
+                NuevoNombre = NuevaPass = string.Empty;
+                await CargarAsync();
+                MostrarToast("Administrador creado correctamente.");
+            }
+            else
+            {
+                ErrorMsgCrear = "No se pudo crear el administrador.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMsgCrear = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    /* ===== Editar / Guardar / Cancelar con toast ===== */
+    private void Editar(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    {
+        EditandoId = a.Id;
+        BackupEdicion = new MauiBlazorDelivery.Services.AdminService.AdminDto
+        {
+            Id = a.Id,
+            NombreUsuario = a.NombreUsuario,
+            Contraseña = a.Contraseña
+        };
+        StateHasChanged();
+    }
+
+    private void CancelarEdicion(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    {
+        if (BackupEdicion != null && BackupEdicion.Id == a.Id)
+        {
+            a.NombreUsuario = BackupEdicion.NombreUsuario;
+            a.Contraseña = BackupEdicion.Contraseña;
+        }
+        EditandoId = null;
+        BackupEdicion = null;
+        StateHasChanged();
+    }
+
+    private async Task GuardarFilaAsync(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    {
+        OkMsg = ErrorMsg = null;
+        if (string.IsNullOrWhiteSpace(a.NombreUsuario) || string.IsNullOrWhiteSpace(a.Contraseña))
+        {
+            ErrorMsg = "Usuario y contraseña no pueden estar vacíos.";
+            return;
+        }
+
+        a.NombreUsuario = a.NombreUsuario.Trim();
+        a.Contraseña = a.Contraseña.Trim();
+
+        var ok = await AdminSvc.ActualizarAsync(a);
+        if (ok)
+        {
+            EditandoId = null;
+            BackupEdicion = null;
+            MostrarToast("Administrador actualizado.");
+        }
+        else
+        {
+            ErrorMsg = "No se pudo actualizar.";
+        }
+    }
+
+    /* ===== Eliminar con confirmación modal + toast ===== */
+    private void ConfirmarEliminar(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    {
+        AdminAEliminar = a;
+        ErrorMsgEliminar = null;
+        MostrarConfirmacionEliminar = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalEliminar()
+    {
+        MostrarConfirmacionEliminar = false;
+        AdminAEliminar = null;
+        ErrorMsgEliminar = null;
+        StateHasChanged();
+    }
+
+    private async Task EliminarConfirmadoAsync()
+    {
+        if (AdminAEliminar is null) return;
+
+        var ok = await AdminSvc.EliminarAsync(AdminAEliminar.Id);
+        MostrarConfirmacionEliminar = false;
+
+        if (ok)
+        {
+            MostrarToast("Administrador eliminado correctamente.");
+            await CargarAsync();
+        }
+        else
+        {
+            ErrorMsg = "No se pudo eliminar el administrador.";
+        }
+    }
+
+    /* ===== Toast helpers (usa tu CSS global) ===== */
+    private void MostrarToast(string texto)
+    {
+        _toastText = texto;
+        _mostrarToast = true;
+        StateHasChanged();
+
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(2500) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) =>
+        {
+            _mostrarToast = false;
+            InvokeAsync(StateHasChanged);
+        };
+        _toastTimer.Start();
+    }
+
+    private void CerrarToast()
+    {
+        _mostrarToast = false;
+        _toastTimer?.Stop();
+        StateHasChanged();
+    }
+
+    /* ===== Nav / Auth ===== */
+    private void VolverPanel() => Nav.NavigateTo("/paneladmin");
+    private void CerrarSesion()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login", true);
+    }
+}

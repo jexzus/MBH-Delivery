@@ -1,0 +1,309 @@
+﻿@page "/gestioncatalogo"
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.AuthService AuthService
+@inject MauiBlazorDelivery.Services.ProductoService ProductoService
+@using MauiBlazorDelivery.Services
+@using Microsoft.AspNetCore.WebUtilities
+
+@code {
+    // ---------- Estado general ----------
+    private List<ProductoDto> _productos = new();
+    private string _buscar = string.Empty;
+    private bool _cargando = true;
+
+    // ---------- Toast ----------
+    private bool _mostrarToast;
+    private System.Timers.Timer? _toastTimer;
+    private string _toastText = "Cambios guardados exitosamente.";
+
+    // ---------- Modal eliminar ----------
+    private bool _showConfirmDelete;
+    private bool _eliminando;
+    private int? _idEliminar;
+    private string? _nombreEliminar;
+    private string? _errorEliminar;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.EstaLogueado || !AuthService.EsAdmin)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await CargarProductos();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && !_mostrarToast)
+        {
+            var uri = new Uri(Nav.Uri);
+            var query = QueryHelpers.ParseQuery(uri.Query);
+            if (query.TryGetValue("ok", out var ok) && ok == "1")
+            {
+                _toastText = "Cambios guardados exitosamente.";
+                MostrarToastTemporal();
+            }
+        }
+    }
+
+    private async Task CargarProductos()
+    {
+        _cargando = true;
+        _productos = await ProductoService.GetTodosAsync();
+        _cargando = false;
+        StateHasChanged();
+    }
+
+    private IEnumerable<ProductoDto> Filtrados =>
+        string.IsNullOrWhiteSpace(_buscar)
+            ? _productos
+            : _productos.Where(p =>
+                   (p.Nombre?.Contains(_buscar, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                   (p.Descripcion?.Contains(_buscar, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private void NuevoProducto() => Nav.NavigateTo("/nuevoproducto");
+    private void VolverPanel() => Nav.NavigateTo("/paneladmin");
+    private void Editar(int id) => Nav.NavigateTo($"/editarproducto/{id}");
+
+    // ---------- Confirmación Eliminar ----------
+    private void AbrirConfirmEliminar(int id, string? nombre)
+    {
+        _idEliminar = id;
+        _nombreEliminar = nombre;
+        _errorEliminar = null;
+        _eliminando = false;
+        _showConfirmDelete = true;
+        StateHasChanged();
+    }
+
+    private void CerrarConfirmEliminar()
+    {
+        _showConfirmDelete = false;
+        _idEliminar = null;
+        _nombreEliminar = null;
+        _errorEliminar = null;
+        _eliminando = false;
+    }
+
+    private async Task ConfirmarEliminarAsync()
+    {
+        if (_idEliminar is null) return;
+
+        _eliminando = true;
+        _errorEliminar = null;
+        StateHasChanged();
+
+        var ok = await ProductoService.EliminarAsync(_idEliminar.Value);
+        _eliminando = false;
+
+        if (ok)
+        {
+            CerrarConfirmEliminar();
+            await CargarProductos();
+            _toastText = "Producto eliminado correctamente.";
+            MostrarToastTemporal();
+        }
+        else
+        {
+            _errorEliminar = "No se pudo eliminar el producto. Inténtalo nuevamente.";
+            StateHasChanged();
+        }
+    }
+
+    private void MostrarToastTemporal()
+    {
+        _mostrarToast = true;
+        StateHasChanged();
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(2500) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) =>
+        {
+            _mostrarToast = false;
+            InvokeAsync(StateHasChanged);
+        };
+        _toastTimer.Start();
+    }
+
+    private void CerrarToast()
+    {
+        _mostrarToast = false;
+        _toastTimer?.Stop();
+    }
+
+    private void CerrarSesion()
+    {
+        AuthService.Logout();
+        Nav.NavigateTo("/login", true);
+    }
+}
+
+<div class="catalog-container">
+    <div class="catalog-header">
+        <h2 class="mb-3">Gestión de Catálogo de Productos</h2>
+
+        <div class="catalog-actions">
+            <div class="catalog-search">
+                <input class="form-control rounded-pill"
+                       placeholder="Buscar productos por nombre o descripción..."
+                       @bind="_buscar" />
+            </div>
+
+            <div class="catalog-buttons">
+                <button class="btn btn-gradient-green" @onclick="NuevoProducto">
+                    Nuevo producto
+                </button>
+                <div class="catalog-count">
+                    Total de productos: <strong>@_productos.Count</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_cargando)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    }
+    else if (!Filtrados.Any())
+    {
+        <div class="alert alert-info">
+            @if (string.IsNullOrWhiteSpace(_buscar))
+            {
+                <p>No hay productos registrados.</p>
+            }
+            else
+            {
+                <p>No hay productos que coincidan con la búsqueda: "<strong>@_buscar</strong>"</p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="catalog-grid">
+            @foreach (var p in Filtrados)
+            {
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="@(!string.IsNullOrWhiteSpace(p.ImagenUrl) ? p.ImagenUrl : "/images/no-image.png")"
+                             alt="@p.Nombre"
+                             onerror="this.onerror=null;this.src='/images/no-image.png'" />
+                    </div>
+
+                    <div class="product-body">
+                        <h5 class="product-title">@p.Nombre</h5>
+                        <p class="product-desc">@p.Descripcion</p>
+                        <div class="product-price">$ @p.Precio.ToString("N2")</div>
+
+                        <div class="product-actions">
+                            <button class="btn btn-edit-orange" @onclick="() => Editar(p.Id)">
+                                Editar
+                            </button>
+                            <button class="btn btn-gradient-red" @onclick="() => AbrirConfirmEliminar(p.Id, p.Nombre)">
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="catalog-footer-actions">
+        <button class="btn btn-gradient-orange" @onclick="VolverPanel">
+            Volver al panel de administrador
+        </button>
+
+        <button class="btn btn-gradient-red" @onclick="CerrarSesion">
+            Cerrar sesión
+        </button>
+    </div>
+
+    @if (_mostrarToast)
+    {
+        <div class="app-toast">
+            <div class="app-toast-body">
+                <div class="app-toast-title">Éxito</div>
+                @_toastText
+            </div>
+            <button class="app-toast-close" @onclick="CerrarToast">×</button>
+        </div>
+    }
+</div>
+
+@* ------- Modal de confirmación para eliminar ------- *@
+@if (_showConfirmDelete)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarConfirmEliminar"></div>
+    <div class="modal-custom">
+        <div class="modal-header">
+            <h5 class="modal-title">Eliminar producto</h5>
+        </div>
+        <div class="modal-body">
+            <p>
+                ¿Estás seguro que quieres eliminar
+                @if (!string.IsNullOrWhiteSpace(_nombreEliminar))
+                {
+                    <text>"<strong>@_nombreEliminar</strong>"</text>
+                }
+                ?
+            </p>
+
+            @if (!string.IsNullOrEmpty(_errorEliminar))
+            {
+                <div class="alert alert-danger">@_errorEliminar</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal"
+                    @onclick="CerrarConfirmEliminar"
+                    disabled="@_eliminando">
+                No, cancelar
+            </button>
+            <button class="btn btn-pill btn-gradient-green"
+                    @onclick="ConfirmarEliminarAsync"
+                    disabled="@_eliminando">
+                @(_eliminando ? "Eliminando..." : "Sí, eliminar")
+            </button>
+        </div>
+    </div>
+}
+
+<style>
+    /* Reutilizamos el mismo estilo de modal que en Editar/Nuevo */
+    .modal-backdrop-custom {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 1040;
+    }
+
+    .modal-custom {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%,-50%);
+        background: #fff;
+        border-radius: .5rem;
+        padding: 1rem;
+        width: min(420px,92vw);
+        box-shadow: 0 10px 30px rgba(0,0,0,.25);
+        z-index: 1050;
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #eee;
+        margin-bottom: .5rem;
+    }
+
+    .modal-footer {
+        display: flex;
+        gap: .5rem;
+        justify-content: flex-end;
+        margin-top: .75rem;
+    }
+</style>

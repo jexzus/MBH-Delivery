@@ -1,0 +1,322 @@
+﻿@page "/carrito"
+@using MauiBlazorDelivery.Services
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ClienteService ClienteSvc
+
+<h2 class="mb-3">Carrito de Compras</h2>
+
+@if (_cargando)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border" role="status"><span class="visually-hidden">Cargando…</span></div>
+    </div>
+}
+else if (!_items.Any())
+{
+    <div class="alert alert-info">
+        Tu carrito está vacío.
+    </div>
+
+    <div class="catalog-footer-actions">
+        <button class="btn btn-gradient-orange" @onclick="SeguirComprando">Seguir comprando</button>
+        <button class="btn btn-gradient-red" @onclick="CerrarSesion">Cerrar sesión</button>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th style="min-width:240px;">Producto</th>
+                    <th style="width:160px;">Precio Unitario</th>
+                    <th style="width:120px;">Cantidad</th>
+                    <th style="width:160px;">Subtotal</th>
+                    <th style="width:120px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var it in _items)
+                {
+                    <tr>
+                        <td>@it.Producto?.NombreProducto</td>
+                        <td>$ @it.PrecioUnitario.ToString("N0")</td>
+                        <td>@it.Cantidad</td>
+                        <td>$ @it.Subtotal.ToString("N0")</td>
+                        <td>
+                            <button class="btn btn-gradient-red btn-sm"
+                                    title="Eliminar"
+                                    @onclick="() => AbrirConfirmEliminar(it.IdProducto, it.Producto?.NombreProducto)">
+                                Eliminar
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-end">Total:</th>
+                    <th colspan="2">$ @_total.ToString("N0")</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="row g-3 mt-3">
+        <div class="col-12 col-md-6">
+            <label class="form-label">Tipo de Entrega:</label>
+            <select class="form-select" @bind="_tipoEntrega">
+                <option value="">Seleccione…</option>
+                <option value="A Domicilio">A Domicilio</option>
+                <option value="Retiro en Tienda">Retiro en Tienda</option>
+            </select>
+            @if (!string.IsNullOrEmpty(_errorEntrega))
+            {
+                <div class="text-danger mt-1">@_errorEntrega</div>
+            }
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label">Observaciones:</label>
+            <textarea class="form-control" rows="3"
+                      placeholder="Instrucciones especiales (opcional)"
+                      @bind="_observaciones"></textarea>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between flex-wrap gap-2 mt-3">
+        <button class="btn btn-edit-orange" @onclick="SeguirComprando">Seguir Comprando</button>
+        <button class="btn btn-gradient-green" @onclick="AbrirConfirmPedido">Confirmar Pedido</button>
+    </div>
+
+    <!-- margen inferior agradable -->
+    <div class="catalog-footer-actions footer-safe-pad">
+        <button class="btn btn-gradient-red btn-full" @onclick="CerrarSesion">
+            Cerrar sesión
+        </button>
+    </div>
+}
+
+@* ---------- Modal: confirmar ELIMINAR ítem ---------- *@
+@if (_confirmEliminarId is not null)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarConfirmEliminar"></div>
+    <div class="modal-custom" role="dialog" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Eliminar del carrito</h5>
+        </div>
+        <div class="modal-body">
+            ¿Eliminar <strong>@_confirmEliminarNombre</strong> del carrito?
+            @if (!string.IsNullOrEmpty(_errorEliminar))
+            {
+                <div class="alert alert-danger mt-2">@_errorEliminar</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarConfirmEliminar" disabled="@_trabajando">
+                No, cancelar
+            </button>
+            <button class="btn btn-pill btn-grad-confirmar" @onclick="ConfirmarEliminarAsync" disabled="@_trabajando">
+                @(_trabajando ? "Eliminando..." : "Sí, eliminar")
+            </button>
+        </div>
+    </div>
+}
+
+@* ---------- Modal: confirmar PEDIDO ---------- *@
+@if (_confirmarPedidoAbierto)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarConfirmPedido"></div>
+    <div class="modal-custom" role="dialog" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Confirmar pedido</h5>
+        </div>
+        <div class="modal-body">
+            Vas a confirmar tu pedido por un total de <strong>$ @_total.ToString("N0")</strong>.
+            <br />
+            Tipo de entrega: <strong>@_tipoEntrega</strong>.
+            @if (!string.IsNullOrEmpty(_errorPedido))
+            {
+                <div class="alert alert-danger mt-2">@_errorPedido</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarConfirmPedido" disabled="@_trabajando">
+                No, cancelar
+            </button>
+            <button class="btn btn-pill btn-grad-confirmar" @onclick="ConfirmarPedidoAsync" disabled="@_trabajando">
+                @(_trabajando ? "Enviando..." : "Sí, confirmar")
+            </button>
+        </div>
+    </div>
+}
+
+@* ---------- Toast ---------- *@
+@if (_mostrarToast)
+{
+    <div class="app-toast">
+        <div class="app-toast-body">
+            <div class="app-toast-title">Éxito</div>
+            @_toastText
+        </div>
+        <button class="app-toast-close" @onclick="CerrarToast">×</button>
+    </div>
+}
+
+@code {
+    private bool _cargando = true;
+    private List<ClienteService.CarritoItemDto> _items = new();
+    private decimal _total;
+
+    // selección y observaciones
+    private string _tipoEntrega = "";
+    private string _observaciones = "";
+    private string? _errorEntrega;
+
+    // modales
+    private int? _confirmEliminarId;
+    private string? _confirmEliminarNombre;
+    private string? _errorEliminar;
+
+    private bool _confirmarPedidoAbierto;
+    private string? _errorPedido;
+
+    // estado general
+    private bool _trabajando;
+    private bool _mostrarToast;
+    private string _toastText = "OK";
+    private System.Timers.Timer? _toastTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.EstaLogueado || Auth.EsAdmin)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _items = await ClienteSvc.GetCarritoAsync(Auth.IdUsuario);
+        _total = _items.Sum(i => i.Subtotal);
+        _cargando = false;
+        StateHasChanged();
+    }
+
+    // ---------- eliminar ----------
+    private void AbrirConfirmEliminar(int idProducto, string? nombre)
+    {
+        _confirmEliminarId = idProducto;
+        _confirmEliminarNombre = nombre;
+        _errorEliminar = null;
+        _trabajando = false;
+    }
+
+    private void CerrarConfirmEliminar()
+    {
+        _confirmEliminarId = null;
+        _confirmEliminarNombre = null;
+        _errorEliminar = null;
+        _trabajando = false;
+    }
+
+    private async Task ConfirmarEliminarAsync()
+    {
+        if (_confirmEliminarId is null) return;
+
+        _trabajando = true;
+        var ok = await ClienteSvc.EliminarDelCarritoAsync(Auth.IdUsuario, _confirmEliminarId.Value);
+        _trabajando = false;
+
+        if (ok)
+        {
+            CerrarConfirmEliminar();
+            await CargarAsync();
+            MostrarToast("Producto eliminado del carrito.");
+        }
+        else
+        {
+            _errorEliminar = "No se pudo eliminar. Intenta nuevamente.";
+            StateHasChanged();
+        }
+    }
+
+    // ---------- pedido ----------
+    private void AbrirConfirmPedido()
+    {
+        _errorEntrega = string.IsNullOrWhiteSpace(_tipoEntrega) ? "El tipo de entrega es obligatorio." : null;
+        if (_errorEntrega is not null) return;
+
+        _errorPedido = null;
+        _confirmarPedidoAbierto = true;
+    }
+
+    private void CerrarConfirmPedido()
+    {
+        _confirmarPedidoAbierto = false;
+        _errorPedido = null;
+        _trabajando = false;
+    }
+
+    private async Task ConfirmarPedidoAsync()
+    {
+        _trabajando = true;
+
+        // La API actual solo recibe Observaciones; incluimos el tipo de entrega al texto:
+        var obs = string.IsNullOrWhiteSpace(_observaciones)
+            ? $"Entrega: {_tipoEntrega}"
+            : $"Entrega: {_tipoEntrega}. {_observaciones}";
+
+        var ok = await ClienteSvc.ConfirmarPedidoAsync(Auth.IdUsuario, obs);
+        _trabajando = false;
+
+        if (ok)
+        {
+            CerrarConfirmPedido();
+            MostrarToast("¡Pedido confirmado correctamente!");
+            // recargar (debería venir carrito vacío)
+            await CargarAsync();
+        }
+        else
+        {
+            _errorPedido = "No se pudo confirmar el pedido.";
+            StateHasChanged();
+        }
+    }
+
+    // ---------- navegación / toast / sesión ----------
+    private void SeguirComprando() => Nav.NavigateTo("/catalogo");
+
+    private void CerrarSesion()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login", true);
+    }
+
+    private void MostrarToast(string texto)
+    {
+        _toastText = texto;
+        _mostrarToast = true;
+        StateHasChanged();
+
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(2300) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) =>
+        {
+            _mostrarToast = false;
+            InvokeAsync(StateHasChanged);
+        };
+        _toastTimer.Start();
+    }
+    private void CerrarToast()
+    {
+        _mostrarToast = false;
+        _toastTimer?.Stop();
+        StateHasChanged();
+    }
+}

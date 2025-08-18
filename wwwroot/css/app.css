@@ -1,0 +1,705 @@
+﻿/* ===== Base ===== */
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+a, .btn-link {
+    color: #006bb7;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #1b6ec2;
+    border-color: #1861ac;
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+.content {
+    padding-top: 1.1rem;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid #e50000;
+}
+
+.validation-message {
+    color: #e50000;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0,0,0,.2);
+    display: none;
+    left: 0;
+    padding: .6rem 1.25rem .7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: .75rem;
+        top: .5rem;
+    }
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,...) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred.";
+    }
+
+/* ===== Safe area iOS ===== */
+.status-bar-safe-area {
+    display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+    .status-bar-safe-area {
+        display: flex;
+        position: sticky;
+        top: 0;
+        height: env(safe-area-inset-top);
+        background: #f7f7f7;
+        width: 100%;
+        z-index: 1;
+    }
+
+    .flex-column, .navbar-brand {
+        padding-left: env(safe-area-inset-left);
+    }
+}
+
+/* ===================== Reset útil ===================== */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* ===================== Fondo global ===================== */
+html, body, #app {
+    height: 100%;
+}
+
+body {
+    background-color: transparent;
+    overflow-x: hidden;
+}
+
+/* Capa de fondo fija */
+.app-bg {
+    position: fixed;
+    inset: 0;
+    background-image: url('/images/fondoapp.jpg');
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    z-index: -1;
+}
+
+/* Contenedores transparentes */
+.page, main, .content, .app-container {
+    background: transparent !important;
+    min-height: 100vh;
+}
+
+/* ===================== Login ===================== */
+.auth-main .content {
+    padding-top: 0 !important;
+}
+
+.login-page {
+    min-height: 100dvh;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 16px;
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+    padding-left: clamp(12px, 4vw, 20px);
+    padding-right: clamp(12px, 4vw, 20px);
+    padding-bottom: 24px;
+}
+
+@media (min-height:700px) {
+    .login-page {
+        align-content: center;
+    }
+}
+
+.login-logo {
+    width: clamp(120px, 38vw, 170px);
+    max-width: 100%;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.25));
+    margin-bottom: 6px;
+}
+
+.login-form {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    background: transparent;
+}
+
+/* ===================== Botones base ===================== */
+:root {
+    --btn-wide-max: 520px;
+    --btn-pad-y: .55rem;
+    --btn-pad-x: 1.1rem;
+}
+
+.btn-gradient-orange {
+    background-image: linear-gradient(135deg, #ff5500, #ffc800);
+    color: #fff;
+    border: none;
+    border-radius: 1.5rem;
+    padding: var(--btn-pad-y) var(--btn-pad-x);
+    font-weight: 600;
+    transition: transform .1s, opacity .1s;
+    width: 100%;
+}
+
+    .btn-gradient-orange:hover, .btn-gradient-orange:focus {
+        transform: scale(1.02);
+        background-image: linear-gradient(135deg,#ff5500,#FF9A00);
+    }
+
+    .btn-gradient-orange:active {
+        transform: scale(.98);
+    }
+
+.link-registrate {
+    font-weight: 700;
+    color: #ff5500;
+    text-decoration: none;
+}
+
+    .link-registrate:hover, .link-registrate:focus {
+        color: #ffa000;
+        text-decoration: underline;
+    }
+
+.form-control:focus {
+    border-color: #ff5500;
+    box-shadow: 0 0 0 .2rem rgba(255,140,0,.25);
+}
+
+/* ====== Panel Admin ====== */
+.admin-panel {
+    min-height: 100dvh;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 16px;
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+    padding-left: clamp(12px, 4vw, 20px);
+    padding-right: clamp(12px, 4vw, 20px);
+    padding-bottom: 24px;
+}
+
+@media (min-height:700px) {
+    .admin-panel {
+        align-content: center;
+    }
+}
+
+.admin-title {
+    text-align: center;
+    margin: 8px 0 12px;
+}
+
+.admin-name {
+    font-weight: 700;
+}
+
+.admin-actions {
+    width: 100%;
+    max-width: 480px;
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+    .admin-actions .btn {
+        width: 100%;
+    }
+
+.admin-logout {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 24px;
+}
+
+/* ====== Catálogo / Cards ====== */
+.catalog-container {
+    min-height: 100dvh;
+    padding: calc(env(safe-area-inset-top) + 16px) clamp(12px,4vw,24px) 28px;
+    display: grid;
+    gap: 16px;
+}
+
+.catalog-header h2 {
+    text-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+
+.catalog-actions {
+    display: grid;
+    gap: 12px;
+}
+
+.catalog-buttons {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+}
+
+.catalog-count {
+    opacity: .9;
+}
+
+@media (min-width:768px) {
+    .catalog-actions {
+        grid-template-columns: minmax(240px,420px) 1fr;
+        align-items: center;
+    }
+
+    .catalog-buttons {
+        justify-content: end;
+        grid-template-columns: auto auto;
+        gap: 16px;
+    }
+}
+
+.catalog-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.product-card {
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(2px);
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    overflow: hidden;
+    display: grid;
+}
+
+.product-img img {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    display: block;
+}
+
+.product-body {
+    padding: 14px;
+    display: grid;
+    gap: 8px;
+}
+
+.product-title {
+    margin: 0;
+}
+
+.product-desc {
+    margin: 0;
+    opacity: .9;
+}
+
+.product-price {
+    margin-top: 4px;
+    font-weight: 700;
+    color: #1b8a2f;
+}
+
+.product-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.catalog-footer-actions {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+    width: 100%;
+    max-width: var(--btn-wide-max);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.btn-gradient-green {
+    background-image: linear-gradient(135deg, #008200, #ccff00);
+    color: #fff;
+    border: none;
+    border-radius: 1.5rem;
+    padding: var(--btn-pad-y) var(--btn-pad-x);
+    font-weight: 600;
+    transition: transform .1s, opacity .1s;
+}
+
+    .btn-gradient-green:hover, .btn-gradient-green:focus {
+        transform: scale(1.02);
+        background-image: linear-gradient(135deg,#0a6a35,#28c266);
+    }
+
+.catalog-buttons .btn-gradient-green {
+    width: 100%;
+    max-width: var(--btn-wide-max);
+    justify-self: start;
+}
+
+.btn-gradient-red {
+    background-image: linear-gradient(135deg, #a10101, #ff2424);
+    color: #fff;
+    border: none;
+    border-radius: 1.5rem;
+    padding: var(--btn-pad-y) var(--btn-pad-x);
+    font-weight: 600;
+    transition: transform .1s, opacity .1s;
+}
+
+    .btn-gradient-red:hover, .btn-gradient-red:focus {
+        transform: scale(1.02);
+        background-image: linear-gradient(135deg,#b71c1c,#ff4242);
+    }
+
+.btn-edit-orange {
+    background-image: linear-gradient(135deg, #ff5000, #ffc107);
+    color: #fff;
+    border: none;
+    border-radius: 1.5rem;
+    padding: var(--btn-pad-y) var(--btn-pad-x);
+    font-weight: 600;
+    transition: transform .1s, opacity .1s;
+}
+
+    .btn-edit-orange:hover, .btn-edit-orange:focus {
+        transform: scale(1.02);
+        background-image: linear-gradient(135deg,#ff8a2a,#ffb300);
+    }
+
+/* ---------- Botones redondeados base ---------- */
+.btn-pill {
+    border-radius: 1.5rem !important;
+    padding: .55rem 1.1rem !important;
+    font-weight: 600;
+    border: 0;
+    transition: transform .08s, filter .12s;
+}
+
+    .btn-pill:hover, .btn-pill:focus {
+        transform: scale(1.02);
+    }
+
+    .btn-pill:active {
+        transform: scale(.98);
+    }
+
+/* “Elegir archivo” */
+.file-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+}
+
+.btn-grad-file {
+    background-image: linear-gradient(135deg,#999,#f0f0f0);
+    color: #222;
+}
+
+    .btn-grad-file:hover, .btn-grad-file:focus {
+        filter: brightness(.97);
+    }
+
+/* Guardar / Cancelar y modales */
+.btn-grad-guardar {
+    background-image: linear-gradient(135deg,#008200,#ccff00);
+    color: #111;
+}
+
+    .btn-grad-guardar:hover, .btn-grad-guardar:focus {
+        filter: brightness(.97);
+    }
+
+.btn-grad-cancelar {
+    background-image: linear-gradient(135deg,#2d2d2d,#787878);
+    color: #fff;
+}
+
+    .btn-grad-cancelar:hover, .btn-grad-cancelar:focus {
+        filter: brightness(1.03);
+    }
+
+.btn-grad-cancelar-modal {
+    background-image: linear-gradient(135deg,#c62828,#ff9c26);
+    color: #fff;
+}
+
+    .btn-grad-cancelar-modal:hover, .btn-grad-cancelar-modal:focus {
+        filter: brightness(1.03);
+    }
+
+.btn-grad-confirmar {
+    background-image: linear-gradient(135deg,#008200,#ccff00);
+    color: #111;
+}
+
+    .btn-grad-confirmar:hover, .btn-grad-confirmar:focus {
+        filter: brightness(.97);
+    }
+
+.edit-page {
+    padding-bottom: clamp(24px, 7vh, 96px);
+}
+
+/* ======================== MODALES REUTILIZABLES ======================== */
+.modal-backdrop-custom {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 1040;
+}
+
+.modal-custom {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%,-50%);
+    background: #fff;
+    border-radius: .5rem;
+    padding: 1rem;
+    width: min(420px, 92vw);
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    z-index: 1050;
+}
+
+.modal-lg {
+    width: min(720px, 96vw);
+}
+
+.modal-header {
+    border-bottom: 1px solid #eee;
+    margin-bottom: .5rem;
+}
+
+.modal-footer {
+    display: flex;
+    gap: .5rem;
+    justify-content: flex-end;
+    margin-top: .75rem;
+}
+
+/* ======================== Gestión de Pedidos (chips/dropdowns) ======================== */
+.dropdownish {
+    position: relative;
+}
+
+.dropdownish-toggle {
+    position: relative;
+}
+
+.dropdownish-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: #fff;
+    border-radius: .5rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    padding: .25rem;
+    z-index: 2500;
+    min-width: 180px;
+}
+
+    .dropdownish-menu li {
+        list-style: none;
+    }
+
+.dropdownish-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    padding: .5rem .75rem;
+    border-radius: .35rem;
+}
+
+    .dropdownish-item:hover {
+        background: #f6f6f6;
+    }
+
+.chip {
+    display: inline-block;
+    padding: .25rem .55rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    font-size: .85rem;
+}
+
+.chip-pendiente {
+    background: #ffe6a1;
+    color: #6b4a00;
+}
+
+.chip-prep {
+    background: #cfe9ff;
+    color: #0b4b73;
+}
+
+.chip-reparto {
+    background: #d2d9ff;
+    color: #193a8a;
+}
+
+.chip-entregado {
+    background: #c9f7d1;
+    color: #0f5e2d;
+}
+
+.row-entregado {
+    background: rgba(0,128,0,.04);
+}
+
+.btn-full {
+    width: 100%;
+    padding: .9rem 1rem;
+    border-radius: 9999px;
+    font-weight: 600;
+}
+
+/* ====== TOAST ====== */
+.app-toast {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    background: #1f2937;
+    color: #fff;
+    border-radius: .5rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    animation: slideIn .18s ease-out;
+    max-width: min(360px, 92vw);
+}
+
+.app-toast-body {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.app-toast-title {
+    font-weight: 600;
+    opacity: .95;
+}
+
+.app-toast-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: .8;
+}
+
+    .app-toast-close:hover {
+        opacity: 1;
+    }
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-6px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ====== PRINT con helper JS ====== */
+@media print {
+    body.print-list * {
+        visibility: hidden !important;
+    }
+
+    body.print-list #print-list, body.print-list #print-list * {
+        visibility: visible !important;
+    }
+
+    body.print-detalle * {
+        visibility: hidden !important;
+    }
+
+    body.print-detalle #print-detalle, body.print-detalle #print-detalle * {
+        visibility: visible !important;
+    }
+}
+
+/* ====== Barra STICKY para catálogo (cliente) ====== */
+.page-title {
+    margin-top: 4px;
+}
+
+.client-actions-sticky {
+    position: sticky;
+    top: 8px; /* subila/bajala si tenés topbar */
+    z-index: 1300;
+    /* opcional: leve blur de fondo cuando queda sticky */
+    /* backdrop-filter: saturate(120%) blur(4px); */
+}
+
+.client-actions-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 620px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+    .client-actions-inner .btn {
+        width: 100%;
+        border-radius: 1.5rem;
+        padding: var(--btn-pad-y) var(--btn-pad-x);
+        font-weight: 700;
+    }
+
+/* “colchón” abajo para que el botón no quede cortado en el borde */
+.footer-safe-pad {
+    padding-bottom: clamp(32px, 8vh, 120px);
+}
+/* ====== Fin ====== */

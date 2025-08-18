@@ -1,0 +1,61 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.AuthService AuthService
+
+@code {
+    // Ruta actual (solo path)
+    string Path => new Uri(Nav.Uri).AbsolutePath;
+
+    bool Starts(string prefix) => Path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+
+    // Páginas de autenticación
+    bool IsAuthPage => Starts("/login") || Starts("/registro");
+
+    // Workspace Admin (sin topbar)
+    bool IsAdminWorkspace =>
+        Starts("/paneladmin") ||
+        Starts("/gestioncatalogo") ||
+        Starts("/gestionpedidos") ||
+        Starts("/gestionadministradores") ||
+        Starts("/editarproducto") ||
+        Starts("/admin/producto/editar") ||
+        Starts("/nuevoproducto") ||
+        Starts("/admin/producto/nuevo");
+
+    // Workspace Cliente (también sin topbar)
+    bool IsClientWorkspace =>
+        Starts("/catalogo") ||
+        Starts("/carrito") ||
+        Starts("/estadopedido");
+
+    // Topbar solo fuera de auth, admin y cliente
+    bool ShowTopbar => !IsAuthPage && !IsAdminWorkspace && !IsClientWorkspace;
+
+    void CerrarSesion()
+    {
+        AuthService.Logout();
+        Nav.NavigateTo("/login", true);
+    }
+}
+
+<div class="page">
+    @if (!IsAuthPage)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
+
+    <main class="@(IsAuthPage ? "auth-main w-100" : "")">
+        @if (ShowTopbar)
+        {
+            <div class="top-row px-4">
+                <button @onclick="CerrarSesion" style="margin-left:20px;">Cerrar Sesión</button>
+            </div>
+        }
+
+        <article class="content @(IsAuthPage ? "" : "px-4")">
+            @Body
+        </article>
+    </main>
+</div>

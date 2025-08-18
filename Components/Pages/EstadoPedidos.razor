@@ -1,0 +1,154 @@
+﻿@page "/estadopedido"
+@using MauiBlazorDelivery.Services
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ClienteService ClienteSvc
+
+<h2 class="mb-3">Mis Pedidos</h2>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_cargando)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border" role="status"><span class="visually-hidden">Cargando...</span></div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <!-- Filtro por estado -->
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <div class="dropdownish">
+                <button type="button" class="btn btn-edit-orange dropdownish-toggle" @onclick="ToggleFiltroMenu">
+                    Filtrar: @_filtroTexto ▾
+                </button>
+                @if (_filtroMenuAbierto)
+                {
+                    <ul class="dropdownish-menu">
+                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Pendiente))">Pendiente</button></li>
+                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnPreparacion))">En preparación</button></li>
+                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnReparto))">En reparto</button></li>
+                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Entregado))">Entregado</button></li>
+                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Todos))">Todos</button></li>
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!Filtrados.Any())
+    {
+        <div class="alert alert-info mt-3">No hay pedidos para ese filtro.</div>
+    }
+    else
+    {
+        <div class="table-responsive mt-3">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Filtrados)
+                    {
+                        <tr class="@(p.EstadoPedido == "Entregado" ? "row-entregado" : "")">
+                            <td>@p.NumPedido</td>
+                            <td>@p.FechaPedido.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="@(p.EstadoPedido switch {
+                                        "Pendiente" => "chip chip-pendiente",
+                                        "En preparación" => "chip chip-prep",
+                                        "En reparto" => "chip chip-reparto",
+                                        "Entregado" => "chip chip-entregado",
+                                        _ => "chip"
+                                })">@p.EstadoPedido</span>
+                            </td>
+                            <td>$ @p.MontoTotal.ToString("N2")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <div class="catalog-footer-actions mt-4 footer-safe-pad">
+        <button class="btn btn-gradient-orange btn-full" @onclick="VolverCatalogo">Volver al catálogo</button>
+        <button class="btn btn-gradient-red btn-full" @onclick="CerrarSesion">Cerrar sesión</button>
+    </div>
+}
+
+@code {
+    private bool _cargando = true;
+    private string? _error;
+    private List<ClienteService.PedidoDto> _pedidos = new();
+
+    // Filtro
+    private enum EstadoFiltro { Pendiente, EnPreparacion, EnReparto, Entregado, Todos }
+    private EstadoFiltro _filtro = EstadoFiltro.Pendiente;
+    private bool _filtroMenuAbierto = false;
+
+    private string _filtroTexto => _filtro switch
+    {
+        EstadoFiltro.Pendiente => "Pendiente",
+        EstadoFiltro.EnPreparacion => "En preparación",
+        EstadoFiltro.EnReparto => "En reparto",
+        EstadoFiltro.Entregado => "Entregado",
+        _ => "Todos"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.EstaLogueado || Auth.EsAdmin)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        try
+        {
+            // 👇 si IdUsuario es 0 probablemente tu login no está devolviendo el id
+            if (Auth.IdUsuario <= 0)
+            {
+                _error = "No se pudo determinar el usuario. Vuelve a iniciar sesión.";
+                return;
+            }
+
+            _pedidos = await ClienteSvc.GetMisPedidosAsync(Auth.IdUsuario);
+        }
+        catch (Exception ex)
+        {
+            _error = "No se pudieron cargar tus pedidos.";
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private IEnumerable<ClienteService.PedidoDto> Filtrados => _pedidos.Where(p => CoincideFiltro(p));
+
+    private bool CoincideFiltro(ClienteService.PedidoDto p) => _filtro switch
+    {
+        EstadoFiltro.Pendiente      => string.Equals(p.EstadoPedido, "Pendiente", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.EnPreparacion  => string.Equals(p.EstadoPedido, "En preparación", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.EnReparto      => string.Equals(p.EstadoPedido, "En reparto", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.Entregado      => string.Equals(p.EstadoPedido, "Entregado", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.Todos          => true,
+        _                           => true
+    };
+
+    private void ToggleFiltroMenu() => _filtroMenuAbierto = !_filtroMenuAbierto;
+    private void CambiarFiltro(EstadoFiltro f) { _filtro = f; _filtroMenuAbierto = false; }
+
+    private void VolverCatalogo() => Nav.NavigateTo("/catalogo");
+    private void CerrarSesion() { Auth.Logout(); Nav.NavigateTo("/login", true); }
+}

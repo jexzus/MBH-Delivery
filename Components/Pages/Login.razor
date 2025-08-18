@@ -1,0 +1,61 @@
+﻿@page "/login"
+@inject NavigationManager NavigationManager
+@inject MauiBlazorDelivery.Services.AuthService AuthService
+
+<div class="login-page">
+    <!-- Logo -->
+    <img class="login-logo" src="/images/logo.png" alt="Jam Burgers" />
+
+    <!-- Formulario -->
+    <div class="login-form text-center">
+        <h3 class="mb-4">Iniciar Sesión</h3>
+
+        <input class="form-control mb-3 rounded-pill"
+               @bind="Username"
+               placeholder="Nombre de Usuario" />
+
+        <input class="form-control mb-3 rounded-pill"
+               @bind="Password"
+               type="password"
+               placeholder="Contraseña" />
+
+        <button class="btn btn-gradient-orange w-100"
+                @onclick="HandleLogin">
+            Ingresar
+        </button>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <p class="text-danger mt-3">@ErrorMessage</p>
+        }
+
+        <p class="mt-3">
+            ¿No tenés cuenta?
+            <a href="/registro" class="link-registrate">Registrate como cliente</a>
+        </p>
+    </div>
+</div>
+
+@code {
+    private string Username { get; set; } = string.Empty;
+    private string Password { get; set; } = string.Empty;
+    private string ErrorMessage { get; set; } = string.Empty;
+
+    private async Task HandleLogin()
+    {
+        ErrorMessage = string.Empty;
+
+        var usuario = await AuthService.LoginAsync(Username, Password);
+        if (usuario is not null)
+        {
+            var rol = usuario.Rol?.Trim().ToLower();
+            if (rol == "admin") NavigationManager.NavigateTo("/paneladmin");
+            else if (rol == "cliente") NavigationManager.NavigateTo("/catalogo");
+            else ErrorMessage = $"Rol no autorizado: {usuario.Rol}";
+        }
+        else
+        {
+            ErrorMessage = "Usuario o contraseña incorrectos.";
+        }
+    }
+}
