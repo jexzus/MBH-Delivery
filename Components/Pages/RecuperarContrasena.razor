@@ -1,0 +1,132 @@
+@page "/recuperar-contrasena"
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.RecuperarContrasenaService RecuperarSvc
+
+<div class="login-page">
+
+    @* ── PASO 1: Email ── *@
+    @if (_paso == 1)
+    {
+        <h2 class="mb-3">Recuperar contraseña</h2>
+        <p class="text-muted mb-3">Ingresá tu email y te enviaremos un código para restablecer tu contraseña.</p>
+
+        <div class="mb-2">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" @bind="_email" placeholder="tu@email.com" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="catalog-footer-actions">
+            <button class="btn btn-gradient-green btn-full" @onclick="SolicitarCodigoAsync" disabled="@_trabajando">
+                @(_trabajando ? "Enviando..." : "Enviar código")
+            </button>
+            <button class="btn btn-gradient-red btn-full" @onclick="VolverLogin">Volver al login</button>
+        </div>
+    }
+
+    @* ── PASO 2: Código + nueva contraseña ── *@
+    else if (_paso == 2)
+    {
+        <h2 class="mb-3">Restablecer contraseña</h2>
+        <p class="text-muted">Enviamos un código de 6 dígitos a <strong>@_email</strong>.</p>
+
+        <div class="mb-2">
+            <label class="form-label">Código de verificación</label>
+            <input class="form-control" @bind="_codigo" placeholder="123456" maxlength="6"
+                   oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Nueva contraseña</label>
+            <input type="password" class="form-control" @bind="_nuevaContrasena" placeholder="Nueva contraseña" />
+            <small class="text-muted">Mínimo 6 caracteres, con letras, números y un carácter especial (!@@#$%...).</small>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Confirmar contraseña</label>
+            <input type="password" class="form-control" @bind="_confirmarContrasena" placeholder="Repetí la contraseña" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="catalog-footer-actions">
+            <button class="btn btn-gradient-green btn-full" @onclick="CambiarContrasenaAsync" disabled="@_trabajando">
+                @(_trabajando ? "Guardando..." : "Cambiar contraseña")
+            </button>
+            <button class="btn btn-gradient-red btn-full" @onclick="@(() => { _paso = 1; _error = null; })" disabled="@_trabajando">
+                Cambiar email
+            </button>
+        </div>
+    }
+
+    @* ── PASO 3: Éxito ── *@
+    else
+    {
+        <h2 class="mb-3">¡Contraseña actualizada!</h2>
+        <p class="text-muted mb-4">Tu contraseña fue cambiada correctamente. Ya podés iniciar sesión.</p>
+
+        <div class="catalog-footer-actions">
+            <button class="btn btn-gradient-green btn-full" @onclick="VolverLogin">Ir al login</button>
+        </div>
+    }
+</div>
+
+@code {
+    private int _paso = 1;
+    private string _email = "";
+    private string _codigo = "";
+    private string _nuevaContrasena = "";
+    private string _confirmarContrasena = "";
+    private string? _error;
+    private bool _trabajando;
+
+    private static readonly System.Text.RegularExpressions.Regex _regexPass =
+        new(@"^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d\s]).{6,}$");
+
+    private async Task SolicitarCodigoAsync()
+    {
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_email))
+        { _error = "Ingresá un email válido."; return; }
+
+        _trabajando = true;
+        var (ok, err) = await RecuperarSvc.SolicitarCodigoAsync(_email.Trim());
+        _trabajando = false;
+
+        if (ok) _paso = 2;
+        else _error = err;
+    }
+
+    private async Task CambiarContrasenaAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_codigo))
+        { _error = "Ingresá el código."; return; }
+
+        if (string.IsNullOrWhiteSpace(_nuevaContrasena))
+        { _error = "Ingresá la nueva contraseña."; return; }
+
+        if (!_regexPass.IsMatch(_nuevaContrasena))
+        { _error = "Debe tener al menos 6 caracteres, con letras, números y un carácter especial (!@#$%...)."; return; }
+
+        if (_nuevaContrasena != _confirmarContrasena)
+        { _error = "Las contraseñas no coinciden."; return; }
+
+        _trabajando = true;
+        var (ok, err) = await RecuperarSvc.CambiarContrasenaAsync(_email.Trim(), _codigo.Trim(), _nuevaContrasena.Trim());
+        _trabajando = false;
+
+        if (ok) _paso = 3;
+        else _error = err;
+    }
+
+    private void VolverLogin() => Nav.NavigateTo("/login", true);
+}

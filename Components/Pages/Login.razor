@@ -1,61 +1,170 @@
 ﻿@page "/login"
 @inject NavigationManager NavigationManager
 @inject MauiBlazorDelivery.Services.AuthService AuthService
+@inject IHttpClientFactory HttpFactory
+@inject MauiBlazorDelivery.Services.SignalRService SignalR
 
-<div class="login-page">
-    <!-- Logo -->
-    <img class="login-logo" src="/images/logo.png" alt="Jam Burgers" />
-
-    <!-- Formulario -->
-    <div class="login-form text-center">
-        <h3 class="mb-4">Iniciar Sesión</h3>
-
-        <input class="form-control mb-3 rounded-pill"
-               @bind="Username"
-               placeholder="Nombre de Usuario" />
-
-        <input class="form-control mb-3 rounded-pill"
-               @bind="Password"
-               type="password"
-               placeholder="Contraseña" />
-
-        <button class="btn btn-gradient-orange w-100"
-                @onclick="HandleLogin">
-            Ingresar
-        </button>
-
-        @if (!string.IsNullOrEmpty(ErrorMessage))
-        {
-            <p class="text-danger mt-3">@ErrorMessage</p>
-        }
-
-        <p class="mt-3">
-            ¿No tenés cuenta?
-            <a href="/registro" class="link-registrate">Registrate como cliente</a>
-        </p>
+@if (IsLoading)
+{
+    <div class="login-page">
+        <img class="login-logo" src="/images/logo.png" alt="Jam Burgers" />
+        <p>Cargando…</p>
+        <small>Base: @_base</small>
     </div>
-</div>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="login-page">
+        <img class="login-logo" src="/images/logo.png" alt="Jam Burgers" />
+        <h4 class="text-danger">Error de conexión</h4>
+        <p style="color:red">@Error</p>
+        @if (!string.IsNullOrEmpty(Details))
+        {
+            <details>
+                <summary>Ver detalles</summary>
+                <pre>@Details</pre>
+            </details>
+        }
+        <button class="btn btn-secondary mt-2" @onclick="CheckApi">Reintentar</button>
+    </div>
+}
+else
+{
+    <div class="login-page">
+        <!-- Logo -->
+        <img class="login-logo" src="/images/logo.png" alt="Jam Burgers" />
+
+        <!-- Formulario -->
+        <div class="login-form text-center">
+            <h3 class="mb-4">Iniciar Sesión</h3>
+
+            <input class="form-control mb-3 rounded-pill"
+                   @bind="Username"
+                   placeholder="Nombre de Usuario" />
+
+            <input class="form-control mb-3 rounded-pill"
+                   @bind="Password"
+                   type="password"
+                   placeholder="Contraseña" />
+
+            <button class="btn btn-gradient-orange w-100"
+                    disabled="@IsSubmitting"
+                    @onclick="HandleLogin">
+                @(IsSubmitting ? "Ingresando..." : "Ingresar")
+            </button>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <p class="text-danger mt-3">@ErrorMessage</p>
+            }
+
+            <p class="mt-3">
+                ¿No tenés cuenta?
+                <a href="/registro" class="link-registrate">Registrate como cliente</a>
+            </p>
+
+            <p class="mt-1">
+                <a href="/recuperar-contrasena" class="link-registrate">¿Olvidaste tu contraseña?</a>
+            </p>
+        </div>
+    </div>
+}
 
 @code {
-    private string Username { get; set; } = string.Empty;
-    private string Password { get; set; } = string.Empty;
-    private string ErrorMessage { get; set; } = string.Empty;
+    // --- UI state ---
+    bool IsLoading = true;          // loading inicial (ping a la API)
+    bool IsSubmitting = false;      // estado del botón "Ingresar"
+    string? Error;                  // error de conectividad inicial
+    string? Details;                // detalles del error (stack)
+    string _base = "";              // para ver qué BaseAddress se está usando
+
+    // --- login state ---
+    string Username { get; set; } = string.Empty;
+    string Password { get; set; } = string.Empty;
+    string ErrorMessage { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckApi();
+    }
+
+    private async Task CheckApi()
+    {
+        IsLoading = true;
+        Error = null;
+        Details = null;
+
+        try
+        {
+            var http = HttpFactory.CreateClient("Api");
+            _base = http.BaseAddress?.ToString() ?? "(sin base)";
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            // Fallbacks típicos: muchos hostings exponen salud en distintos paths
+            var paths = new[] { "api/health", "health" };
+            HttpResponseMessage? resp = null;
+            var errores = new System.Text.StringBuilder();
+
+            foreach (var p in paths)
+            {
+                try
+                {
+                    resp = await http.GetAsync(p, cts.Token);
+                    if (resp.IsSuccessStatusCode) break;
+                    errores.AppendLine($"{p} → HTTP {(int)resp.StatusCode}");
+                }
+                catch (Exception ex)
+                {
+                    errores.AppendLine($"{p} → {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            if (resp is null || !resp.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"No se pudo conectar al API ({_base})\n{errores}");
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            Details = ex.ToString();
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task HandleLogin()
     {
         ErrorMessage = string.Empty;
+        IsSubmitting = true;
 
-        var usuario = await AuthService.LoginAsync(Username, Password);
-        if (usuario is not null)
+        try
         {
-            var rol = usuario.Rol?.Trim().ToLower();
-            if (rol == "admin") NavigationManager.NavigateTo("/paneladmin");
-            else if (rol == "cliente") NavigationManager.NavigateTo("/catalogo");
-            else ErrorMessage = $"Rol no autorizado: {usuario.Rol}";
+            var usuario = await AuthService.LoginAsync(Username, Password);
+            if (usuario is not null)
+            {
+                var rol = usuario.Rol?.Trim().ToLowerInvariant() ?? "";
+                _ = SignalR.ConnectAsync(rol, usuario.IdUsuario);
+                if (rol is "admin" or "superadmin") NavigationManager.NavigateTo("/paneladmin");
+                else if (rol == "vendedor") NavigationManager.NavigateTo("/panelvendedor");
+                else if (rol == "cliente") NavigationManager.NavigateTo("/catalogo");
+                else if (rol == "repartidor") NavigationManager.NavigateTo("/panelrepartidor");
+                else ErrorMessage = $"Rol no autorizado: {usuario.Rol}";
+            }
+            else
+            {
+                ErrorMessage = "Usuario o contraseña incorrectos o error de red.";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            ErrorMessage = "Usuario o contraseña incorrectos.";
+            ErrorMessage = $"Error al iniciar sesión: {ex.Message}";
+        }
+        finally
+        {
+            IsSubmitting = false;
         }
     }
 }

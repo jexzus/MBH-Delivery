@@ -1,11 +1,10 @@
-﻿@page "/paneladmin"
+@page "/paneladmin"
 @inject NavigationManager NavigationManager
 @inject MauiBlazorDelivery.Services.AuthService AuthService
 
 @code {
     protected override void OnInitialized()
     {
-        // Si no está logueado o no es admin → volver a login
         if (!AuthService.EstaLogueado || !AuthService.EsAdmin)
             NavigationManager.NavigateTo("/login");
     }
@@ -15,6 +14,8 @@
     void IrGestionCatalogo() => NavigationManager.NavigateTo("/gestioncatalogo");
     void IrGestionPedidos() => NavigationManager.NavigateTo("/gestionpedidos");
     void IrGestionAdmins() => NavigationManager.NavigateTo("/gestionadministradores");
+    void IrGestionVendedores() => NavigationManager.NavigateTo("/gestionvendedores");
+    void IrGestionRepartidores() => NavigationManager.NavigateTo("/gestionrepartidores");
     void CerrarSesion()
     {
         AuthService.Logout();
@@ -36,6 +37,14 @@
 
         <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionAdmins">
             Gestión de administradores
+        </button>
+
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionVendedores">
+            Gestión de vendedores
+        </button>
+
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionRepartidores">
+            Gestión de repartidores
         </button>
     </div>
 

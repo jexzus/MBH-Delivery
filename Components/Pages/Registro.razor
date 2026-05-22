@@ -1,64 +1,114 @@
-﻿@page "/registro"
+@page "/registro"
 @inject NavigationManager Nav
 @inject MauiBlazorDelivery.Services.AuthService Auth
+@inject MauiBlazorDelivery.Services.PreRegistroService PreRegistroSvc
+@using Microsoft.AspNetCore.Components.Forms
 
-<h2 class="mb-3">Registro de Cliente</h2>
+<div class="login-page">
 
-<div class="login-page" style="max-width:720px; margin-left:auto; margin-right:auto;">
-    <EditForm EditContext="_editContext">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-
+    @* ── PASO 1: Email ── *@
+    @if (_paso == 1)
+    {
+        <h2 class="mb-3">Registro — Verificación de email</h2>
         <div class="mb-2">
-            <label class="form-label">Nombre de usuario</label>
-            <InputText class="form-control" @bind-Value="_vm.NombreUsuario" />
-            <ValidationMessage For="@(() => _vm.NombreUsuario)" />
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" @bind="_email" placeholder="tu@email.com" />
         </div>
-
-        <div class="mb-2">
-            <label class="form-label">Contraseña</label>
-            <input type="password" class="form-control" @bind="_vm.Contrasena" />
-            <small class="text-muted">Debe contener letras y números (solo caracteres alfanuméricos).</small>
-            <ValidationMessage For="@(() => _vm.Contrasena)" />
-        </div>
-
-        <div class="mb-2">
-            <label class="form-label">Nombre</label>
-            <InputText class="form-control" @bind-Value="_vm.Nombre" />
-            <ValidationMessage For="@(() => _vm.Nombre)" />
-        </div>
-
-        <div class="mb-2">
-            <label class="form-label">Apellido</label>
-            <InputText class="form-control" @bind-Value="_vm.Apellido" />
-            <ValidationMessage For="@(() => _vm.Apellido)" />
-        </div>
-
-        <div class="mb-2">
-            <label class="form-label">Número de teléfono</label>
-            <InputText class="form-control" @bind-Value="_vm.NumTelefono"
-                       oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
-            <ValidationMessage For="@(() => _vm.NumTelefono)" />
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Domicilio</label>
-            <InputText class="form-control" @bind-Value="_vm.Domicilio" />
-            <ValidationMessage For="@(() => _vm.Domicilio)" />
-        </div>
-
-        <div class="d-grid gap-2" style="max-width:520px; margin: 0 auto;">
-            <button type="button" class="btn btn-gradient-green btn-full" @onclick="AbrirConfirmacion">
-                Registrarse
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        <div class="catalog-footer-actions">
+            <button class="btn btn-gradient-green btn-full" @onclick="EnviarCodigoAsync" disabled="@_trabajando">
+                @(_trabajando ? "Enviando..." : "Enviar código")
             </button>
-            <button type="button" class="btn btn-gradient-red btn-full" @onclick="VolverLogin">
-                Volver al login
+            <button class="btn btn-gradient-red btn-full" @onclick="VolverLogin">Volver al login</button>
+        </div>
+    }
+
+    @* ── PASO 2: Código ── *@
+    else if (_paso == 2)
+    {
+        <h2 class="mb-3">Ingresá el código</h2>
+        <p class="text-muted">Enviamos un código de 6 dígitos a <strong>@_email</strong>.</p>
+        <div class="mb-2">
+            <label class="form-label">Código de verificación</label>
+            <input class="form-control" @bind="_codigo" placeholder="123456" maxlength="6"
+                   oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        <div class="catalog-footer-actions">
+            <button class="btn btn-gradient-green btn-full" @onclick="ConfirmarCodigoAsync" disabled="@_trabajando">
+                @(_trabajando ? "Verificando..." : "Verificar código")
+            </button>
+            <button class="btn btn-gradient-red btn-full" @onclick="@(() => { _paso = 1; _error = null; })">
+                Cambiar email
             </button>
         </div>
-    </EditForm>
+    }
+
+    @* ── PASO 3: Datos del cliente ── *@
+    else
+    {
+        <h2 class="mb-3">Completá tu perfil</h2>
+        <EditForm EditContext="_editContext">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-2">
+                <label class="form-label">Nombre de usuario</label>
+                <InputText class="form-control" @bind-Value="_vm.NombreUsuario" />
+                <ValidationMessage For="@(() => _vm.NombreUsuario)" />
+            </div>
+
+            <div class="mb-2">                                                                 
+                <label class="form-label">Contraseña</label>
+                <input type="password" class="form-control" @bind="_vm.Contrasena" />
+                <small class="text-muted">Mínimo 6 caracteres, con letras, números y un carácter especial (!@@#$%...).</small>
+                <ValidationMessage For="@(() => _vm.Contrasena)" />
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Nombre</label>
+                <InputText class="form-control" @bind-Value="_vm.Nombre" />
+                <ValidationMessage For="@(() => _vm.Nombre)" />
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Apellido</label>
+                <InputText class="form-control" @bind-Value="_vm.Apellido" />
+                <ValidationMessage For="@(() => _vm.Apellido)" />
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Número de teléfono</label>
+                <InputText class="form-control" @bind-Value="_vm.NumTelefono"
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+                <ValidationMessage For="@(() => _vm.NumTelefono)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Domicilio</label>
+                <InputText class="form-control" @bind-Value="_vm.Domicilio" />
+                <ValidationMessage For="@(() => _vm.Domicilio)" />
+            </div>
+
+            <div class="catalog-footer-actions">
+                <button type="button" class="btn btn-gradient-green btn-full" @onclick="AbrirConfirmacion">
+                    Registrarse
+                </button>
+                <button type="button" class="btn btn-gradient-red btn-full" @onclick="VolverLogin">
+                    Cancelar
+                </button>
+            </div>
+        </EditForm>
+    }
 </div>
 
-@* ---------- Modal de confirmación ---------- *@
+@* Modal confirmación paso 3 *@
 @if (_confirmAbierto)
 {
     <div class="modal-backdrop-custom" @onclick="CerrarConfirmacion"></div>
@@ -67,14 +117,14 @@
             <h5 class="modal-title">Confirmar registro</h5>
         </div>
         <div class="modal-body">
-            <p>¿Crear una cuenta de cliente con los siguientes datos?</p>
-            <ul style="margin:0; padding-left:1rem">
+            <p>¿Crear cuenta con los siguientes datos?</p>
+            <ul class="m-0 ps-3">
+                <li><strong>Email:</strong> @_email</li>
                 <li><strong>Usuario:</strong> @_vm.NombreUsuario</li>
                 <li><strong>Nombre:</strong> @_vm.Nombre @_vm.Apellido</li>
                 <li><strong>Teléfono:</strong> @_vm.NumTelefono</li>
                 <li><strong>Domicilio:</strong> @_vm.Domicilio</li>
             </ul>
-
             @if (!string.IsNullOrWhiteSpace(_error))
             {
                 <div class="alert alert-danger mt-2">@_error</div>
@@ -82,7 +132,7 @@
         </div>
         <div class="modal-footer">
             <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarConfirmacion" disabled="@_trabajando">
-                No, cancelar
+                Cancelar
             </button>
             <button class="btn btn-pill btn-grad-confirmar" @onclick="ConfirmarRegistroAsync" disabled="@_trabajando">
                 @(_trabajando ? "Enviando..." : "Sí, registrar")
@@ -91,7 +141,7 @@
     </div>
 }
 
-@* ---------- Toast ---------- *@
+@* Toast *@
 @if (_mostrarToast)
 {
     <div class="app-toast">
@@ -104,20 +154,23 @@
 }
 
 @code {
-    // ===== VM con validaciones de DataAnnotations =====
+    private int _paso = 1;
+    private string _email = "";
+    private string _codigo = "";
+    private string? _error;
+    private bool _trabajando;
+
     private class RegistroVm
     {
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El usuario es obligatorio.")]
         [System.ComponentModel.DataAnnotations.MinLength(3, ErrorMessage = "Mínimo 3 caracteres.")]
         public string NombreUsuario { get; set; } = string.Empty;
 
-        // Alfanumérica y debe contener al menos 1 letra y 1 número
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "La contraseña es obligatoria.")]
-        [System.ComponentModel.DataAnnotations.RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]+$",
-            ErrorMessage = "Debe contener letras y números (solo alfanumérica).")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d\s]).{6,}$",
+            ErrorMessage = "Debe tener al menos 6 caracteres, letras, números y un carácter especial (!@#...).")]
         public string Contrasena { get; set; } = string.Empty;
 
-        // Solo letras (con espacios y acentos)
         [System.ComponentModel.DataAnnotations.Required]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$",
             ErrorMessage = "Solo letras.")]
@@ -128,10 +181,8 @@
             ErrorMessage = "Solo letras.")]
         public string Apellido { get; set; } = string.Empty;
 
-        // Solo números
         [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.RegularExpression(@"^\d+$",
-            ErrorMessage = "Solo números.")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^\d+$", ErrorMessage = "Solo números.")]
         public string NumTelefono { get; set; } = string.Empty;
 
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El domicilio es obligatorio.")]
@@ -140,18 +191,42 @@
 
     private readonly RegistroVm _vm = new();
     private EditContext _editContext = default!;
-
     private bool _confirmAbierto;
-    private bool _trabajando;
-    private string? _error;
-
     private bool _mostrarToast;
-    private string _toastText = "OK";
+    private string _toastText = "";
     private System.Timers.Timer? _toastTimer;
 
     protected override void OnInitialized()
     {
         _editContext = new EditContext(_vm);
+    }
+
+    private async Task EnviarCodigoAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_email))
+        { _error = "Ingresá un email válido."; return; }
+
+        _trabajando = true;
+        _error = null;
+        var (ok, err) = await PreRegistroSvc.EnviarCodigoAsync(_email.Trim());
+        _trabajando = false;
+
+        if (ok) _paso = 2;
+        else _error = err;
+    }
+
+    private async Task ConfirmarCodigoAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_codigo))
+        { _error = "Ingresá el código."; return; }
+
+        _trabajando = true;
+        _error = null;
+        var (ok, err) = await PreRegistroSvc.ConfirmarCodigoAsync(_email.Trim(), _codigo.Trim());
+        _trabajando = false;
+
+        if (ok) _paso = 3;
+        else _error = err;
     }
 
     private void AbrirConfirmacion()
@@ -179,7 +254,8 @@
             Nombre = _vm.Nombre.Trim(),
             Apellido = _vm.Apellido.Trim(),
             NumTelefono = _vm.NumTelefono.Trim(),
-            Domicilio = _vm.Domicilio.Trim()
+            Domicilio = _vm.Domicilio.Trim(),
+            Email = _email.Trim()
         };
 
         var (ok, error) = await Auth.RegistrarClienteAsync(dto);
@@ -189,7 +265,6 @@
         {
             CerrarConfirmacion();
             MostrarToast("Registro realizado correctamente.");
-            // pequeño delay para que se vea el toast y volvemos al login
             await Task.Delay(1400);
             VolverLogin();
         }
@@ -201,26 +276,15 @@
 
     private void VolverLogin() => Nav.NavigateTo("/login", true);
 
-    // ===== Toast reutilizado =====
     private void MostrarToast(string texto)
     {
         _toastText = texto;
         _mostrarToast = true;
         StateHasChanged();
-
         _toastTimer?.Stop();
         _toastTimer = new System.Timers.Timer(2200) { AutoReset = false };
-        _toastTimer.Elapsed += (_, __) =>
-        {
-            _mostrarToast = false;
-            InvokeAsync(StateHasChanged);
-        };
+        _toastTimer.Elapsed += (_, __) => { _mostrarToast = false; InvokeAsync(StateHasChanged); };
         _toastTimer.Start();
     }
-    private void CerrarToast()
-    {
-        _mostrarToast = false;
-        _toastTimer?.Stop();
-        StateHasChanged();
-    }
+    private void CerrarToast() { _mostrarToast = false; _toastTimer?.Stop(); }
 }

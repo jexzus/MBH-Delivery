@@ -26,13 +26,13 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion   Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<!-- Icono/Splash -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" />
+		<MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" ForegroundScale="0.65" />
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 
 		<!-- Imágenes -->
@@ -48,6 +48,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.8" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="9.0.8" />
 		<PackageReference Include="Microsoft.Extensions.Http" Version="9.0.8" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.90" />
@@ -63,5 +64,20 @@
 		<!-- habilitar wwwroot para BlazorWebView -->
 		<MauiAsset Include="wwwroot\**" LogicalName="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
+
+	
+
+	<!-- ✅ NUEVO: publica para ARM64 (dispositivo físico) y x64 (emulador) en Release -->
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+
+		<!-- (Opcional) Si querés forzar APK en lugar de AAB al publicar:
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    -->
+
+		<!-- (Opcional) Si ves tamaños grandes y querés trimming más agresivo:
+    <PublishTrimmed>true</PublishTrimmed>
+    -->
+	</PropertyGroup>
 
 </Project>

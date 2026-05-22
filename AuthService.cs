@@ -12,11 +12,26 @@ namespace MauiBlazorDelivery.Services
 
         public async Task<UsuarioLogin?> LoginAsync(string username, string password)
         {
+            if (MauiProgram.DemoMode)
+            {
+                await Task.Delay(500);
+                if (username == "admin" && password == "admin")
+                {
+                    UsuarioActual = new UsuarioLogin { IdUsuario = 1, NombreUsuario = "admin", Rol = "admin" };
+                    return UsuarioActual;
+                }
+                if (username == "cliente" && password == "cliente")
+                {
+                    UsuarioActual = new UsuarioLogin { IdUsuario = 2, NombreUsuario = "cliente", Rol = "cliente" };
+                    return UsuarioActual;
+                }
+                return null;
+            }
+
             var request = new { NombreUsuario = username, Contraseña = password };
             var response = await _http.PostAsJsonAsync("api/usuarios/login", request);
             if (!response.IsSuccessStatusCode) return null;
 
-            // debug opcional
             var contenido = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"[DEBUG AuthService] Login → {contenido}");
 
@@ -44,14 +59,18 @@ namespace MauiBlazorDelivery.Services
             }
         }
 
-        // Si tu backend viejo devuelve "id" la app igual funciona.
+        // Si el backend viejo devuelve "id" la app igual funciona.
         public int IdUsuario =>
             (UsuarioActual?.IdUsuario ?? 0) != 0
                 ? UsuarioActual!.IdUsuario
                 : (UsuarioActual?.IdAlternativo ?? 0);
 
-        public bool EsAdmin => UsuarioActual?.Rol?.Trim().ToLower() == "admin";
+        public bool EsAdmin => UsuarioActual?.Rol?.Trim().ToLower() is "admin" or "superadmin";
+        public bool EsSuperAdmin => UsuarioActual?.Rol?.Trim().ToLower() == "superadmin";
+        public bool EsVendedor => UsuarioActual?.Rol?.Trim().ToLower() == "vendedor";
+        public bool EsRepartidor => UsuarioActual?.Rol?.Trim().ToLower() == "repartidor";
         public bool EsCliente => UsuarioActual?.Rol?.Trim().ToLower() == "cliente";
+        public bool PuedeGestionarPedidos => EsAdmin || EsVendedor;
         public bool EstaLogueado => UsuarioActual is not null;
 
         public void Logout() => UsuarioActual = null;
@@ -73,7 +92,7 @@ namespace MauiBlazorDelivery.Services
         public string Rol { get; set; } = string.Empty;
     }
 
-    /// DTO para registrar cliente (serializa con las claves que espera tu API)
+    /// DTO para registrar cliente (serializa con las claves que espera la API)
     public class RegistroClienteDto
     {
         [JsonPropertyName("NombreUsuario")]
@@ -94,5 +113,8 @@ namespace MauiBlazorDelivery.Services
 
         [JsonPropertyName("Domicilio")]
         public string Domicilio { get; set; } = string.Empty;
+
+        [JsonPropertyName("Email")]
+        public string Email { get; set; } = string.Empty;
     }
 }

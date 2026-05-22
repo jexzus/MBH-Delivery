@@ -22,7 +22,7 @@ namespace MauiBlazorDelivery.Services
             public string? NombreProducto { get; set; }
             public string? Descripcion { get; set; }
             public decimal Precio { get; set; }
-            public string? ImagenUrl { get; set; }   // <- usado por Catalogo.razor
+            public string? ImagenUrl { get; set; }   
         }
 
         public class CarritoItemDto
@@ -39,6 +39,7 @@ namespace MauiBlazorDelivery.Services
             public int NumPedido { get; set; }
             public DateTime FechaPedido { get; set; }
             public string EstadoPedido { get; set; } = "Pendiente";
+            public string? ModoEntrega { get; set; }
             public decimal MontoTotal { get; set; }
             public string? Observaciones { get; set; }
             public List<CarritoItemDto> DetallePedidos { get; set; } = new();
@@ -69,6 +70,7 @@ namespace MauiBlazorDelivery.Services
             public int NumPedido { get; set; }
             public DateTime FechaPedido { get; set; }
             public string? EstadoPedido { get; set; }
+            public string? ModoEntrega { get; set; }
             public decimal MontoTotal { get; set; }
             public string? Observaciones { get; set; }
             public List<DetalleApi> DetallePedidos { get; set; } = new();
@@ -161,14 +163,15 @@ namespace MauiBlazorDelivery.Services
             }
         }
 
-        public async Task<bool> ConfirmarPedidoAsync(int idUsuario, string observaciones)
+        public async Task<bool> ConfirmarPedidoAsync(int idUsuario, string observaciones, string? modoEntrega = null)
         {
             try
             {
                 var resp = await _http.PostAsJsonAsync("api/cliente/confirmar-pedido", new
                 {
                     IdUsuario = idUsuario,
-                    Observaciones = observaciones
+                    Observaciones = observaciones,
+                    ModoEntrega = modoEntrega
                 });
                 return resp.IsSuccessStatusCode;
             }
@@ -176,6 +179,29 @@ namespace MauiBlazorDelivery.Services
             {
                 Console.WriteLine($"[ClienteService] ConfirmarPedidoAsync error: {ex.Message}");
                 return false;
+            }
+        }
+
+        // null = éxito, string = mensaje de error
+        public async Task<string?> CancelarPedidoAsync(int numPedido, int idUsuario)
+        {
+            try
+            {
+                var resp = await _http.PostAsJsonAsync("api/cliente/cancelar-pedido", new
+                {
+                    NumPedido = numPedido,
+                    IdUsuario = idUsuario
+                });
+                if (resp.IsSuccessStatusCode) return null;
+                var body = await resp.Content.ReadAsStringAsync();
+                return string.IsNullOrWhiteSpace(body)
+                    ? $"Error {(int)resp.StatusCode} – respuesta vacía del servidor."
+                    : body.Trim('"');
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ClienteService] CancelarPedidoAsync error: {ex.Message}");
+                return "Error de conexión.";
             }
         }
 
@@ -193,6 +219,7 @@ namespace MauiBlazorDelivery.Services
                     NumPedido = p.NumPedido,
                     FechaPedido = p.FechaPedido,
                     EstadoPedido = p.EstadoPedido ?? "Pendiente",
+                    ModoEntrega = p.ModoEntrega,
                     MontoTotal = p.MontoTotal,
                     Observaciones = p.Observaciones,
                     DetallePedidos = p.DetallePedidos.Select(d => new CarritoItemDto

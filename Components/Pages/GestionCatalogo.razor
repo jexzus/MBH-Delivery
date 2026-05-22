@@ -25,7 +25,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!AuthService.EstaLogueado || !AuthService.EsAdmin)
+        if (!AuthService.EstaLogueado || (!AuthService.EsAdmin && !AuthService.EsVendedor))
         {
             Nav.NavigateTo("/login");
             return;
@@ -64,7 +64,7 @@
                    (p.Descripcion?.Contains(_buscar, StringComparison.OrdinalIgnoreCase) ?? false));
 
     private void NuevoProducto() => Nav.NavigateTo("/nuevoproducto");
-    private void VolverPanel() => Nav.NavigateTo("/paneladmin");
+    private void VolverPanel() => Nav.NavigateTo(AuthService.EsVendedor ? "/panelvendedor" : "/paneladmin");
     private void Editar(int id) => Nav.NavigateTo($"/editarproducto/{id}");
 
     // ---------- Confirmación Eliminar ----------
@@ -223,6 +223,7 @@
         </button>
     </div>
 
+    @* toast global *@
     @if (_mostrarToast)
     {
         <div class="app-toast">
@@ -235,11 +236,11 @@
     }
 </div>
 
-@* ------- Modal de confirmación para eliminar ------- *@
+@* ------- Modal de confirmación para eliminar (usa estilos globales de modal) ------- *@
 @if (_showConfirmDelete)
 {
     <div class="modal-backdrop-custom" @onclick="CerrarConfirmEliminar"></div>
-    <div class="modal-custom">
+    <div class="modal-custom" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
         <div class="modal-header">
             <h5 class="modal-title">Eliminar producto</h5>
         </div>
@@ -272,38 +273,3 @@
         </div>
     </div>
 }
-
-<style>
-    /* Reutilizamos el mismo estilo de modal que en Editar/Nuevo */
-    .modal-backdrop-custom {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.45);
-        z-index: 1040;
-    }
-
-    .modal-custom {
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%,-50%);
-        background: #fff;
-        border-radius: .5rem;
-        padding: 1rem;
-        width: min(420px,92vw);
-        box-shadow: 0 10px 30px rgba(0,0,0,.25);
-        z-index: 1050;
-    }
-
-    .modal-header {
-        border-bottom: 1px solid #eee;
-        margin-bottom: .5rem;
-    }
-
-    .modal-footer {
-        display: flex;
-        gap: .5rem;
-        justify-content: flex-end;
-        margin-top: .75rem;
-    }
-</style>

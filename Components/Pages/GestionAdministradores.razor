@@ -1,17 +1,14 @@
 ﻿@page "/gestionadministradores"
 @inject MauiBlazorDelivery.Services.AuthService Auth
 @inject MauiBlazorDelivery.Services.AdminService AdminSvc
+@using MauiBlazorDelivery.Services
 @inject NavigationManager Nav
 
 <h2 class="mb-3">Gestión de Administradores</h2>
 
-@if (!string.IsNullOrEmpty(OkMsg))
+@if (!string.IsNullOrEmpty(_loadError))
 {
-    <div class="alert alert-success">@OkMsg</div>
-}
-@if (!string.IsNullOrEmpty(ErrorMsg))
-{
-    <div class="alert alert-danger">@ErrorMsg</div>
+    <div class="alert alert-danger">@_loadError</div>
 }
 
 @if (Cargando)
@@ -20,7 +17,7 @@
 }
 else
 {
-    <!-- CREAR NUEVO (con confirmación) -->
+    @* crear nuevo (usa .edit-page y botón ancho .btn-full del css global) *@
     <form class="edit-page" @onsubmit="AbrirConfirmCrear" @onsubmit:preventDefault>
         <h5 class="mt-2">Crear Nuevo Administrador</h5>
 
@@ -34,7 +31,6 @@ else
         </div>
 
         <div class="d-flex flex-column gap-2">
-            <!-- Botón grande como cerrar sesión -->
             <button type="submit" class="btn btn-gradient-orange btn-full">Crear Administrador</button>
         </div>
     </form>
@@ -49,60 +45,51 @@ else
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th style="min-width:200px">Usuario</th>
-                        <th style="min-width:220px">Contraseña</th>
-                        <th style="width:260px">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var a in Admins)
+        @foreach (var a in Admins)
+        {
+            var enEdicion = EditandoId == a.Id;
+            <div class="gp-card">
+                <div class="gp-card-body" style="padding-top:10px">
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Usuario</span>
+                        @if (enEdicion)
+                        {
+                            <InputText class="form-control form-control-sm" @bind-Value="a.NombreUsuario" />
+                        }
+                        else
+                        {
+                            <span>@a.NombreUsuario</span>
+                        }
+                    </div>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Contraseña</span>
+                        @if (enEdicion)
+                        {
+                            <InputText class="form-control form-control-sm" @bind-Value="_nuevaPassEdicion" type="password" placeholder="Nueva contraseña (opcional)" />
+                        }
+                        else
+                        {
+                            <span>******</span>
+                        }
+                    </div>
+                </div>
+                <div class="gp-card-actions">
+                    @if (enEdicion)
                     {
-                        var enEdicion = EditandoId == a.Id;
-                        <tr>
-                            <td>
-                                @if (enEdicion)
-                                {
-                                    <InputText class="form-control" @bind-Value="a.NombreUsuario" />
-                                }
-                                else
-                                {
-                                    <input class="form-control" value="@a.NombreUsuario" disabled />
-                                }
-                            </td>
-                            <td>
-                                @if (enEdicion)
-                                {
-                                    <InputText class="form-control" @bind-Value="a.Contraseña" type="text" />
-                                }
-                                else
-                                {
-                                    <input class="form-control" value="@a.Contraseña" disabled />
-                                }
-                            </td>
-                            <td class="d-flex gap-2">
-                                @if (enEdicion)
-                                {
-                                    <button class="btn btn-gradient-green" @onclick="() => GuardarFilaAsync(a)">Guardar</button>
-                                    <button class="btn btn-gradient-orange" @onclick="() => CancelarEdicion(a)">Cancelar</button>
-                                }
-                                else
-                                {
-                                    <button class="btn btn-edit-orange" @onclick="() => Editar(a)">Editar</button>
-                                    <button class="btn btn-gradient-red" @onclick="() => ConfirmarEliminar(a)">Eliminar</button>
-                                }
-                            </td>
-                        </tr>
+                        <button class="btn btn-gradient-green gp-btn" @onclick="() => GuardarFilaAsync(a)">Guardar</button>
+                        <button class="btn btn-gradient-orange gp-btn" @onclick="() => CancelarEdicion(a)">Cancelar</button>
                     }
-                </tbody>
-            </table>
-        </div>
+                    else
+                    {
+                        <button class="btn btn-edit-orange gp-btn" @onclick="() => Editar(a)">Editar</button>
+                        <button class="btn btn-gradient-red gp-btn" @onclick="() => ConfirmarEliminar(a)">Eliminar</button>
+                    }
+                </div>
+            </div>
+        }
     }
 
-    <!-- Botones inferiores: Volver + Cerrar sesión (mismo tamaño) -->
+    @* botones inferiores anchos y consistentes *@
     <div class="catalog-footer-actions footer-safe-pad">
         <button class="btn btn-gradient-orange btn-full" @onclick="VolverPanel">
             Volver al panel de administrador
@@ -114,11 +101,11 @@ else
     </div>
 }
 
-@* ------- Modal confirmar CREAR ------- *@
+@* ------- Modal confirmar CREAR (usa clases globales de modal) ------- *@
 @if (MostrarConfirmacionCrear)
 {
     <div class="modal-backdrop-custom" @onclick="CerrarModalCrear"></div>
-    <div class="modal-custom">
+    <div class="modal-custom" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
         <div class="modal-header">
             <h5 class="modal-title">Confirmar creación</h5>
         </div>
@@ -136,11 +123,11 @@ else
     </div>
 }
 
-@* ------- Modal confirmar ELIMINAR ------- *@
+@* ------- Modal confirmar ELIMINAR (usa clases globales de modal) ------- *@
 @if (MostrarConfirmacionEliminar)
 {
     <div class="modal-backdrop-custom" @onclick="CerrarModalEliminar"></div>
-    <div class="modal-custom">
+    <div class="modal-custom" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
         <div class="modal-header">
             <h5 class="modal-title">Confirmar eliminación</h5>
         </div>
@@ -158,91 +145,41 @@ else
     </div>
 }
 
-@* ------- Toast (usa tu CSS global de .app-toast) ------- *@
 @if (_mostrarToast)
 {
     <div class="app-toast">
         <div class="app-toast-body">
-            <div class="app-toast-title">Éxito</div>
+            <div class="app-toast-title">@_toastTitulo</div>
             @_toastText
         </div>
         <button class="app-toast-close" @onclick="CerrarToast">×</button>
     </div>
 }
 
-<style>
-    /* === Modal: centrado, por encima de todo y con texto visible === */
-    .modal-backdrop-custom {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.45);
-        z-index: 3000;
-    }
-
-    .modal-custom {
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%,-50%);
-        background: #fff;
-        border-radius: .5rem;
-        padding: 1rem;
-        width: min(420px,92vw);
-        box-shadow: 0 10px 30px rgba(0,0,0,.25);
-        z-index: 3001;
-        /* FIX: evita que herede color blanco/transparente y se vea “vacío” */
-        color: #212529;
-    }
-
-        .modal-custom * {
-            color: #212529;
-        }
-
-    .modal-header {
-        border-bottom: 1px solid #eee;
-        margin-bottom: .5rem;
-    }
-
-    .modal-footer {
-        display: flex;
-        gap: .5rem;
-        justify-content: flex-end;
-        margin-top: .75rem;
-    }
-
-    /* Botones grandes (mismo ancho para todos los destacados) */
-    .btn-full {
-        width: 100%;
-        padding: .9rem 1rem;
-        border-radius: 9999px;
-        font-weight: 600;
-    }
-</style>
-
 @code {
     private bool Cargando = true;
-    private string? OkMsg;
-    private string? ErrorMsg;
+    private string? _loadError;
 
     // Crear nuevo
     private string NuevoNombre = string.Empty;
     private string NuevaPass = string.Empty;
 
     // Listado y edición
-    private List<MauiBlazorDelivery.Services.AdminService.AdminDto> Admins = new();
+    private List<AdminService.AdminDto> Admins = new();
     private int? EditandoId = null;
-    private MauiBlazorDelivery.Services.AdminService.AdminDto? BackupEdicion;
+    private AdminService.AdminDto? BackupEdicion;
+    private string _nuevaPassEdicion = "";
 
     // Confirmaciones
     private bool MostrarConfirmacionCrear = false;
     private string? ErrorMsgCrear;
     private bool MostrarConfirmacionEliminar = false;
-    private MauiBlazorDelivery.Services.AdminService.AdminDto? AdminAEliminar;
+    private AdminService.AdminDto? AdminAEliminar;
     private string? ErrorMsgEliminar;
 
-    // Toast
     private bool _mostrarToast;
-    private string _toastText = "Operación exitosa.";
+    private string _toastTitulo = "";
+    private string _toastText = "";
     private System.Timers.Timer? _toastTimer;
 
     protected override async Task OnInitializedAsync()
@@ -260,12 +197,12 @@ else
         try
         {
             Cargando = true;
-            OkMsg = ErrorMsg = null;
+            _loadError = null;
             Admins = await AdminSvc.GetAdminsAsync();
         }
         catch (Exception ex)
         {
-            ErrorMsg = $"No se pudieron cargar los administradores: {ex.Message}";
+            _loadError = $"No se pudieron cargar los administradores: {ex.Message}";
             Console.WriteLine(ex);
         }
         finally
@@ -281,7 +218,7 @@ else
         ErrorMsgCrear = null;
         if (string.IsNullOrWhiteSpace(NuevoNombre) || string.IsNullOrWhiteSpace(NuevaPass))
         {
-            ErrorMsg = "Completá usuario y contraseña.";
+            MostrarToast("Atención", "Completá usuario y contraseña.");
             return;
         }
         MostrarConfirmacionCrear = true;
@@ -299,7 +236,6 @@ else
     {
         try
         {
-            OkMsg = ErrorMsg = null;
             ErrorMsgCrear = null;
 
             var ok = await AdminSvc.CrearAsync(new(NuevoNombre.Trim(), NuevaPass.Trim()));
@@ -308,7 +244,7 @@ else
                 MostrarConfirmacionCrear = false;
                 NuevoNombre = NuevaPass = string.Empty;
                 await CargarAsync();
-                MostrarToast("Administrador creado correctamente.");
+                MostrarToast("Éxito", "Administrador creado correctamente.");
             }
             else
             {
@@ -326,57 +262,55 @@ else
     }
 
     /* ===== Editar / Guardar / Cancelar con toast ===== */
-    private void Editar(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    private void Editar(AdminService.AdminDto a)
     {
         EditandoId = a.Id;
-        BackupEdicion = new MauiBlazorDelivery.Services.AdminService.AdminDto
+        _nuevaPassEdicion = "";
+        BackupEdicion = new AdminService.AdminDto
         {
             Id = a.Id,
-            NombreUsuario = a.NombreUsuario,
-            Contraseña = a.Contraseña
+            NombreUsuario = a.NombreUsuario
         };
         StateHasChanged();
     }
 
-    private void CancelarEdicion(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    private void CancelarEdicion(AdminService.AdminDto a)
     {
         if (BackupEdicion != null && BackupEdicion.Id == a.Id)
-        {
             a.NombreUsuario = BackupEdicion.NombreUsuario;
-            a.Contraseña = BackupEdicion.Contraseña;
-        }
         EditandoId = null;
         BackupEdicion = null;
+        _nuevaPassEdicion = "";
         StateHasChanged();
     }
 
-    private async Task GuardarFilaAsync(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    private async Task GuardarFilaAsync(AdminService.AdminDto a)
     {
-        OkMsg = ErrorMsg = null;
-        if (string.IsNullOrWhiteSpace(a.NombreUsuario) || string.IsNullOrWhiteSpace(a.Contraseña))
+        if (string.IsNullOrWhiteSpace(a.NombreUsuario))
         {
-            ErrorMsg = "Usuario y contraseña no pueden estar vacíos.";
+            MostrarToast("Atención", "El nombre de usuario no puede estar vacío.");
             return;
         }
 
         a.NombreUsuario = a.NombreUsuario.Trim();
-        a.Contraseña = a.Contraseña.Trim();
 
         var ok = await AdminSvc.ActualizarAsync(a);
-        if (ok)
+        if (!ok) { MostrarToast("Error", "No se pudo actualizar el usuario."); return; }
+
+        if (!string.IsNullOrWhiteSpace(_nuevaPassEdicion))
         {
-            EditandoId = null;
-            BackupEdicion = null;
-            MostrarToast("Administrador actualizado.");
+            var okPass = await AdminSvc.CambiarContrasenaAsync(a.Id, _nuevaPassEdicion.Trim());
+            if (!okPass) { MostrarToast("Error", "Usuario actualizado, pero no se pudo cambiar la contraseña."); return; }
         }
-        else
-        {
-            ErrorMsg = "No se pudo actualizar.";
-        }
+
+        EditandoId = null;
+        BackupEdicion = null;
+        _nuevaPassEdicion = "";
+        MostrarToast("Éxito", "Administrador actualizado.");
     }
 
     /* ===== Eliminar con confirmación modal + toast ===== */
-    private void ConfirmarEliminar(MauiBlazorDelivery.Services.AdminService.AdminDto a)
+    private void ConfirmarEliminar(AdminService.AdminDto a)
     {
         AdminAEliminar = a;
         ErrorMsgEliminar = null;
@@ -401,29 +335,25 @@ else
 
         if (ok)
         {
-            MostrarToast("Administrador eliminado correctamente.");
+            MostrarToast("Éxito", "Administrador eliminado correctamente.");
             await CargarAsync();
         }
         else
         {
-            ErrorMsg = "No se pudo eliminar el administrador.";
+            MostrarToast("Error", "No se pudo eliminar el administrador.");
         }
     }
 
-    /* ===== Toast helpers (usa tu CSS global) ===== */
-    private void MostrarToast(string texto)
+    private void MostrarToast(string titulo, string texto)
     {
+        _toastTitulo = titulo;
         _toastText = texto;
         _mostrarToast = true;
         StateHasChanged();
 
         _toastTimer?.Stop();
-        _toastTimer = new System.Timers.Timer(2500) { AutoReset = false };
-        _toastTimer.Elapsed += (_, __) =>
-        {
-            _mostrarToast = false;
-            InvokeAsync(StateHasChanged);
-        };
+        _toastTimer = new System.Timers.Timer(3000) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) => { _mostrarToast = false; InvokeAsync(StateHasChanged); };
         _toastTimer.Start();
     }
 

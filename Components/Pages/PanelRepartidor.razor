@@ -1,0 +1,494 @@
+@page "/panelrepartidor"
+@using MauiBlazorDelivery.Services
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject PedidosService PedidosSvc
+@inject RepartidorService RepartidorSvc
+@inject SignalRService SignalR
+@implements IDisposable
+
+<h2 class="mb-2">Hola, <strong>@Auth.UsuarioActual?.NombreUsuario</strong></h2>
+
+@if (_miRepartidor is not null)
+{
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <span>Mi disponibilidad:</span>
+        <select class="form-select form-select-sm w-auto" value="@_miRepartidor.Disponibilidad"
+                @onchange="CambiarDisponibilidadAsync">
+            <option value="Activo">Activo</option>
+            <option value="Ocupado" disabled>Ocupado (asignado por el sistema)</option>
+            <option value="Inactivo">Inactivo</option>
+        </select>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_cargando)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else
+{
+    @* ── Pedidos En reparto activos ──────────────────────────────── *@
+    <h5 class="mt-3 mb-2">Mis pedidos en reparto</h5>
+    @if (_pedidosEnReparto.Count == 0)
+    {
+        <p class="text-muted">No tenés pedidos activos en reparto.</p>
+    }
+    else
+    {
+        @foreach (var p in _pedidosEnReparto)
+        {
+            <div class="gp-card" style="border-left:4px solid #16a34a; background:#f0fdf4">
+                <div class="gp-card-head">
+                    <strong>Pedido #@p.NumPedido</strong>
+                    <span class="chip chip-reparto">En reparto</span>
+                </div>
+                <div class="gp-card-body">
+                    <div class="gp-row"><span class="gp-label">Cliente</span><span>@p.Cliente?.Nombre @p.Cliente?.Apellido</span></div>
+                    <div class="gp-row"><span class="gp-label">Teléfono</span><span>@p.Cliente?.NumTelefono</span></div>
+                    <div class="gp-row"><span class="gp-label">Domicilio</span><span>@p.Cliente?.Domicilio</span></div>
+                    <div class="gp-row"><span class="gp-label">Total</span><strong>$ @p.MontoTotal.ToString("N2")</strong></div>
+                    @if (!string.IsNullOrWhiteSpace(p.Observaciones))
+                    {
+                        <div class="gp-row"><span class="gp-label">Obs</span><span class="text-muted small">@p.Observaciones</span></div>
+                    }
+                </div>
+                <div class="gp-card-actions">
+                    <button class="btn btn-gradient-red gp-btn"
+                            disabled="@(_cancelando == p.NumPedido || _marcando == p.NumPedido)"
+                            @onclick="() => AbrirConfirmCancelar(p)">
+                        Cancelar reparto
+                    </button>
+                    <button class="btn btn-gradient-green gp-btn flex-fill"
+                            disabled="@(_marcando == p.NumPedido || _cancelando == p.NumPedido)"
+                            @onclick="() => MarcarEntregadoAsync(p)">
+                        @(_marcando == p.NumPedido ? "Guardando..." : "Entregado")
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Pedidos disponibles para tomar ──────────────────────────── *@
+    @if (_pedidosDisponibles.Count > 0)
+    {
+        <h5 class="mt-4 mb-2">Pedidos disponibles para tomar</h5>
+        @if (_pedidosEnReparto.Count > 0)
+        {
+            <div class="alert alert-warning py-2 mb-2">Debés entregar tu pedido activo antes de aceptar otro.</div>
+        }
+        @foreach (var pd in _pedidosDisponibles)
+        {
+            <div class="gp-card" style="border-left:4px solid #d97706; background:#fffbeb">
+                <div class="gp-card-head">
+                    <strong>Pedido #@pd.NumPedido</strong>
+                    <span class="chip chip-espera">Disponible</span>
+                </div>
+                <div class="gp-card-body">
+                    <div class="gp-row"><span class="gp-label">Cliente</span><span>@pd.Cliente</span></div>
+                    <div class="gp-row"><span class="gp-label">Domicilio</span><span>@pd.Domicilio</span></div>
+                    <div class="gp-row"><span class="gp-label">Tel</span><span>@pd.Telefono</span></div>
+                    <div class="gp-row"><span class="gp-label">Productos</span><span class="text-muted small">@pd.Productos</span></div>
+                    <div class="gp-row"><span class="gp-label">Total</span><strong>$@pd.MontoTotal</strong></div>
+                    @if (!string.IsNullOrWhiteSpace(pd.Observaciones))
+                    {
+                        <div class="gp-row"><span class="gp-label">Obs</span><span class="text-muted small">@pd.Observaciones</span></div>
+                    }
+                </div>
+                <div class="gp-card-actions">
+                    <button class="btn btn-gradient-green gp-btn flex-fill"
+                            disabled="@(_aceptando == pd.NumPedido || _pedidosEnReparto.Count > 0)"
+                            @onclick="() => AceptarDesdeListaAsync(pd)">
+                        @(_aceptando == pd.NumPedido ? "Aceptando..." : "Aceptar")
+                    </button>
+                </div>
+            </div>
+        }
+    }
+}
+
+<div class="catalog-footer-actions mt-3 footer-safe-pad">
+    <button class="btn btn-gradient-red btn-full" @onclick="CerrarSesion">Cerrar sesión</button>
+</div>
+
+@* Modal confirmar CANCELAR reparto *@
+@if (_confirmCancelarPedido is not null)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarConfirmCancelar"></div>
+    <div class="modal-custom" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Cancelar reparto</h5>
+        </div>
+        <div class="modal-body">
+            <p>¿Cancelar el reparto del pedido <strong>#@_confirmCancelarPedido.NumPedido</strong>?</p>
+            <p class="text-muted small">Solo podés cancelar dentro de los 5 minutos de haber aceptado.</p>
+            @if (!string.IsNullOrEmpty(_errorCancelar))
+            {
+                <div class="alert alert-danger mt-2">@_errorCancelar</div>
+            }
+        </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-pill btn-grad-cancelar-modal flex-fill"
+                    disabled="@(_cancelando == _confirmCancelarPedido.NumPedido)"
+                    @onclick="CerrarConfirmCancelar">No, continuar</button>
+            <button class="btn btn-pill btn-gradient-red flex-fill"
+                    disabled="@(_cancelando == _confirmCancelarPedido.NumPedido)"
+                    @onclick="ConfirmarCancelarAsync">
+                @(_cancelando == _confirmCancelarPedido.NumPedido ? "Cancelando..." : "Sí, cancelar")
+            </button>
+        </div>
+    </div>
+}
+
+@* Modal de nueva solicitud de reparto *@
+@if (_pedidoEntrante is not null)
+{
+    <div class="modal-backdrop-custom"></div>
+    <div class="modal-custom" role="dialog" aria-modal="true">
+        <div class="modal-header" style="background:#f59e0b;color:#fff;">
+            <h5 class="modal-title">🛵 Nueva solicitud de reparto</h5>
+        </div>
+        <div class="modal-body">
+            <div><strong>Pedido #@_pedidoEntrante.NumPedido</strong></div>
+            <div><strong>Cliente:</strong> @_pedidoEntrante.Cliente</div>
+            <div><strong>Domicilio:</strong> @_pedidoEntrante.Domicilio</div>
+            <div><strong>Tel:</strong> @_pedidoEntrante.Telefono</div>
+            <div><strong>Productos:</strong> @_pedidoEntrante.Productos</div>
+            <div><strong>Total: $@_pedidoEntrante.MontoTotal</strong></div>
+            @if (!string.IsNullOrWhiteSpace(_pedidoEntrante.Observaciones))
+            {
+                <div class="text-muted small mt-1">Obs: @_pedidoEntrante.Observaciones</div>
+            }
+            @if (!string.IsNullOrEmpty(_errorAceptar))
+            {
+                <div class="alert alert-danger mt-2">@_errorAceptar</div>
+            }
+        </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-pill btn-grad-cancelar-modal flex-fill"
+                    disabled="@(_aceptando == _pedidoEntrante.NumPedido)"
+                    @onclick="IgnorarPedidoEntrante">
+                Ignorar
+            </button>
+            <button class="btn btn-pill btn-grad-confirmar flex-fill"
+                    disabled="@(_aceptando == _pedidoEntrante.NumPedido || _pedidosEnReparto.Count > 0)"
+                    @onclick="AceptarPedidoEntranteAsync">
+                @(_pedidosEnReparto.Count > 0 ? "Ya tenés un pedido activo" : _aceptando == _pedidoEntrante.NumPedido ? "Aceptando..." : "Aceptar")
+            </button>
+        </div>
+    </div>
+}
+
+@if (_mostrarToast)
+{
+    <div class="app-toast">
+        <div class="app-toast-body">
+            <div class="app-toast-title">Éxito</div>
+            @_toastText
+        </div>
+        <button class="app-toast-close" @onclick="() => _mostrarToast = false">×</button>
+    </div>
+}
+
+@code {
+    private List<PedidosService.PedidoDto> _pedidosEnReparto = new();
+    private List<PedidosService.PedidoDisponibleDto> _pedidosDisponibles = new();
+    private RepartidorService.RepartidorDto? _miRepartidor;
+    private bool _cargando = true;
+    private string? _error;
+    private int? _marcando;
+    private int? _aceptando;
+    private int? _cancelando;
+    private string? _errorAceptar;
+    private PedidosService.PedidoDto? _confirmCancelarPedido;
+    private string? _errorCancelar;
+    private bool _mostrarToast;
+    private string _toastText = "";
+    private System.Timers.Timer? _toastTimer;
+
+    private SignalRService.NuevoPedidoDto? _pedidoEntrante;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.EstaLogueado || !Auth.EsRepartidor)
+        { Nav.NavigateTo("/login"); return; }
+
+        SignalR.EstadoCambiadoGlobal += OnEstadoCambiado;
+        SignalR.NuevoPedidoParaReparto += OnNuevoPedido;
+        SignalR.CerrarAlerta += OnCerrarAlerta;
+        SignalR.PedidoAsignado += OnPedidoAsignado;
+
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        try
+        {
+            var todos = await PedidosSvc.GetPedidosAsync();
+            var repartidores = await RepartidorSvc.GetTodosAsync();
+            _miRepartidor = repartidores.FirstOrDefault(r => r.IdUsuario == Auth.IdUsuario);
+
+            _pedidosEnReparto = todos
+                .Where(p => p.EstadoPedido.Equals("En reparto", StringComparison.OrdinalIgnoreCase)
+                            && p.IdRepartidor == _miRepartidor?.Id)
+                .ToList();
+
+            // Cargar pedidos disponibles para tomar
+            _pedidosDisponibles = await PedidosSvc.GetPedidosDisponiblesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error al cargar: {ex.Message}";
+        }
+        finally
+        {
+            _cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnEstadoCambiado(int numPedido, string nuevoEstado)
+    {
+        if (nuevoEstado.Equals("En reparto", StringComparison.OrdinalIgnoreCase))
+        {
+            InvokeAsync(async () => { await CargarAsync(); });
+            return;
+        }
+
+        // Si el admin marcó como Entregado un pedido que era de este repartidor,
+        // recargar para que _miRepartidor.Disponibilidad vuelva a "Activo"
+        if (nuevoEstado.Equals("Entregado", StringComparison.OrdinalIgnoreCase))
+        {
+            bool eraMioPedido = _pedidosEnReparto.Any(x => x.NumPedido == numPedido);
+            if (eraMioPedido)
+            {
+                InvokeAsync(async () => { await CargarAsync(); });
+                return;
+            }
+        }
+
+        // Si revirtieron a En preparación, quitar de disponibles (ya no está solicitado)
+        if (nuevoEstado.Equals("En preparación", StringComparison.OrdinalIgnoreCase))
+        {
+            _pedidosDisponibles.RemoveAll(x => x.NumPedido == numPedido);
+            if (_pedidoEntrante?.NumPedido == numPedido) _pedidoEntrante = null;
+        }
+
+        // EsperandoRepartidor llega por NuevoPedidoParaReparto — no recargar aquí para evitar duplicados
+
+        var p = _pedidosEnReparto.FirstOrDefault(x => x.NumPedido == numPedido);
+        if (p is not null) _pedidosEnReparto.Remove(p);
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnNuevoPedido(SignalRService.NuevoPedidoDto dto)
+    {
+        // Solo mostrar si estoy activo
+        if (_miRepartidor?.Disponibilidad != "Activo") return;
+
+        _pedidoEntrante = dto;
+        _errorAceptar = null;
+
+        // Agregar a disponibles si no está
+        if (!_pedidosDisponibles.Any(x => x.NumPedido == dto.NumPedido))
+        {
+            _pedidosDisponibles.Add(new PedidosService.PedidoDisponibleDto
+            {
+                NumPedido = dto.NumPedido,
+                Cliente = dto.Cliente,
+                Domicilio = dto.Domicilio,
+                Telefono = dto.Telefono,
+                MontoTotal = dto.MontoTotal,
+                Productos = dto.Productos,
+                Observaciones = dto.Observaciones
+            });
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnCerrarAlerta(int numPedido)
+    {
+        if (_pedidoEntrante?.NumPedido == numPedido)
+            _pedidoEntrante = null;
+
+        _pedidosDisponibles.RemoveAll(x => x.NumPedido == numPedido);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnPedidoAsignado(int numPedido, int repartidorId)
+    {
+        // Si otro repartidor tomó el pedido, quitarlo de disponibles
+        if (_miRepartidor?.Id != repartidorId)
+        {
+            if (_pedidoEntrante?.NumPedido == numPedido)
+                _pedidoEntrante = null;
+            _pedidosDisponibles.RemoveAll(x => x.NumPedido == numPedido);
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AceptarPedidoEntranteAsync()
+    {
+        if (_pedidoEntrante is null || _miRepartidor is null) return;
+
+        _aceptando = _pedidoEntrante.NumPedido;
+        _errorAceptar = null;
+        StateHasChanged();
+
+        var (ok, mensaje, yaFueTomado) = await PedidosSvc.AceptarPedidoAsync(_pedidoEntrante.NumPedido, _miRepartidor.Id);
+
+        if (ok)
+        {
+            _pedidoEntrante = null;
+            _aceptando = null;
+            MostrarToast("¡Pedido aceptado! Ya estás en camino.");
+            await CargarAsync();
+        }
+        else if (yaFueTomado)
+        {
+            _errorAceptar = mensaje;
+            _aceptando = null;
+            StateHasChanged();
+            await Task.Delay(2000);
+            _pedidoEntrante = null;
+            StateHasChanged();
+        }
+        else
+        {
+            _errorAceptar = mensaje;
+            _aceptando = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AceptarDesdeListaAsync(PedidosService.PedidoDisponibleDto pd)
+    {
+        if (_miRepartidor is null) return;
+
+        _aceptando = pd.NumPedido;
+        StateHasChanged();
+
+        var (ok, mensaje, yaFueTomado) = await PedidosSvc.AceptarPedidoAsync(pd.NumPedido, _miRepartidor.Id);
+
+        if (ok)
+        {
+            _pedidosDisponibles.Remove(pd);
+            MostrarToast($"¡Pedido #{pd.NumPedido} aceptado!");
+            await CargarAsync();
+        }
+        else
+        {
+            MostrarToast(mensaje);
+            if (yaFueTomado) _pedidosDisponibles.Remove(pd);
+        }
+
+        _aceptando = null;
+        StateHasChanged();
+    }
+
+    private async Task IgnorarPedidoEntrante()
+    {
+        if (_pedidoEntrante is null) return;
+        await SignalR.RechazarPedidoAsync(_pedidoEntrante.NumPedido);
+        _pedidoEntrante = null;
+        StateHasChanged();
+    }
+
+    private async Task MarcarEntregadoAsync(PedidosService.PedidoDto p)
+    {
+        _marcando = p.NumPedido;
+        try
+        {
+            var ok = await PedidosSvc.CambiarEstadoAsync(p.NumPedido, "Entregado");
+            if (ok)
+            {
+                _pedidosEnReparto.Remove(p);
+                MostrarToast($"Pedido #{p.NumPedido} marcado como entregado.");
+                // Recargar para que _miRepartidor.Disponibilidad vuelva a "Activo"
+                await CargarAsync();
+            }
+            else _error = "No se pudo actualizar el estado.";
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _marcando = null; StateHasChanged(); }
+    }
+
+    private async Task CambiarDisponibilidadAsync(ChangeEventArgs e)
+    {
+        if (_miRepartidor is null) return;
+        var nueva = e.Value?.ToString() ?? "";
+        if (nueva == "Ocupado") return;
+        var ok = await RepartidorSvc.CambiarDisponibilidadAsync(_miRepartidor.Id, nueva);
+        if (ok) _miRepartidor.Disponibilidad = nueva;
+    }
+
+    private void AbrirConfirmCancelar(PedidosService.PedidoDto p)
+    {
+        _confirmCancelarPedido = p;
+        _errorCancelar = null;
+        StateHasChanged();
+    }
+
+    private void CerrarConfirmCancelar()
+    {
+        _confirmCancelarPedido = null;
+        _errorCancelar = null;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmarCancelarAsync()
+    {
+        if (_confirmCancelarPedido is null || _miRepartidor is null) return;
+
+        _cancelando = _confirmCancelarPedido.NumPedido;
+        _errorCancelar = null;
+        StateHasChanged();
+
+        var (ok, mensaje) = await PedidosSvc.CancelarRepartoAsync(_confirmCancelarPedido.NumPedido, _miRepartidor.Id);
+        _cancelando = null;
+
+        if (ok)
+        {
+            CerrarConfirmCancelar();
+            MostrarToast("Reparto cancelado. El pedido volvió a búsqueda de repartidor.");
+            await CargarAsync();
+        }
+        else
+        {
+            _errorCancelar = mensaje;
+            StateHasChanged();
+        }
+    }
+
+    private void MostrarToast(string texto)
+    {
+        _toastText = texto;
+        _mostrarToast = true;
+        StateHasChanged();
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(2500) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) => { _mostrarToast = false; InvokeAsync(StateHasChanged); };
+        _toastTimer.Start();
+    }
+
+    private void CerrarSesion() { Auth.Logout(); Nav.NavigateTo("/login", true); }
+
+    public void Dispose()
+    {
+        SignalR.EstadoCambiadoGlobal -= OnEstadoCambiado;
+        SignalR.NuevoPedidoParaReparto -= OnNuevoPedido;
+        SignalR.CerrarAlerta -= OnCerrarAlerta;
+        SignalR.PedidoAsignado -= OnPedidoAsignado;
+    }
+}

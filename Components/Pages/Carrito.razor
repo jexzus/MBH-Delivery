@@ -25,42 +25,30 @@ else if (!_items.Any())
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <thead>
-                <tr>
-                    <th style="min-width:240px;">Producto</th>
-                    <th style="width:160px;">Precio Unitario</th>
-                    <th style="width:120px;">Cantidad</th>
-                    <th style="width:160px;">Subtotal</th>
-                    <th style="width:120px;">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var it in _items)
-                {
-                    <tr>
-                        <td>@it.Producto?.NombreProducto</td>
-                        <td>$ @it.PrecioUnitario.ToString("N0")</td>
-                        <td>@it.Cantidad</td>
-                        <td>$ @it.Subtotal.ToString("N0")</td>
-                        <td>
-                            <button class="btn btn-gradient-red btn-sm"
-                                    title="Eliminar"
-                                    @onclick="() => AbrirConfirmEliminar(it.IdProducto, it.Producto?.NombreProducto)">
-                                Eliminar
-                            </button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-            <tfoot>
-                <tr>
-                    <th colspan="3" class="text-end">Total:</th>
-                    <th colspan="2">$ @_total.ToString("N0")</th>
-                </tr>
-            </tfoot>
-        </table>
+    @foreach (var it in _items)
+    {
+        <div class="gp-card">
+            <div class="gp-card-head">
+                <strong>@it.Producto?.NombreProducto</strong>
+                <span class="fw-bold">$ @it.Subtotal.ToString("N0")</span>
+            </div>
+            <div class="gp-card-body">
+                <div class="gp-row"><span class="gp-label">Precio</span><span>$ @it.PrecioUnitario.ToString("N0")</span></div>
+                <div class="gp-row"><span class="gp-label">Cantidad</span><span>@it.Cantidad</span></div>
+            </div>
+            <div class="gp-card-actions">
+                <button class="btn btn-gradient-red gp-btn"
+                        @onclick="() => AbrirConfirmEliminar(it.IdProducto, it.Producto?.NombreProducto)">
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    }
+    <div class="gp-card" style="background:#f9fafb">
+        <div class="gp-card-head">
+            <strong>Total</strong>
+            <strong style="font-size:1.1rem">$ @_total.ToString("N0")</strong>
+        </div>
     </div>
 
     <div class="row g-3 mt-3">
@@ -68,8 +56,8 @@ else
             <label class="form-label">Tipo de Entrega:</label>
             <select class="form-select" @bind="_tipoEntrega">
                 <option value="">Seleccione…</option>
-                <option value="A Domicilio">A Domicilio</option>
-                <option value="Retiro en Tienda">Retiro en Tienda</option>
+                <option value="Domicilio">A Domicilio</option>
+                <option value="Tienda">Retiro en Tienda</option>
             </select>
             @if (!string.IsNullOrEmpty(_errorEntrega))
             {
@@ -267,12 +255,7 @@ else
     {
         _trabajando = true;
 
-        // La API actual solo recibe Observaciones; incluimos el tipo de entrega al texto:
-        var obs = string.IsNullOrWhiteSpace(_observaciones)
-            ? $"Entrega: {_tipoEntrega}"
-            : $"Entrega: {_tipoEntrega}. {_observaciones}";
-
-        var ok = await ClienteSvc.ConfirmarPedidoAsync(Auth.IdUsuario, obs);
+        var ok = await ClienteSvc.ConfirmarPedidoAsync(Auth.IdUsuario, _observaciones, _tipoEntrega);
         _trabajando = false;
 
         if (ok)

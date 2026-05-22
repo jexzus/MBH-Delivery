@@ -5,6 +5,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>MauiBlazorDelivery</title>
+    <link rel="icon" href="data:," />
     <base href="/" />
     <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
@@ -16,7 +17,6 @@
     <!-- <div class="bg-overlay"></div> -->
 
     <div id="app">Cargando...</div>
-    <script src="_framework/blazor.webview.js"></script>
     <script>
         window.mauiPrintHelper = {
             printWithClass: function (cls) {
@@ -27,6 +27,7 @@
             }
         };
     </script>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 
 </html>

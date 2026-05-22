@@ -35,9 +35,17 @@ namespace MauiBlazorDelivery.Services
             var resp = await _http.PutAsJsonAsync("api/usuarios/actualizar-admin", new
             {
                 Id = admin.Id,
-                NombreUsuario = admin.NombreUsuario,
-                Contraseña = admin.Contraseña,
-                Rol = "admin"
+                NombreUsuario = admin.NombreUsuario
+            });
+            return resp.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> CambiarContrasenaAsync(int id, string nuevaPass)
+        {
+            var resp = await _http.PutAsJsonAsync("api/usuarios/cambiar-contrasena-por-id", new
+            {
+                Id = id,
+                NuevaContrasena = nuevaPass
             });
             return resp.IsSuccessStatusCode;
         }

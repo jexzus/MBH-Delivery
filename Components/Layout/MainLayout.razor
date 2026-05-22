@@ -14,9 +14,13 @@
     // Workspace Admin (sin topbar)
     bool IsAdminWorkspace =>
         Starts("/paneladmin") ||
+        Starts("/panelrepartidor") ||
+        Starts("/panelvendedor") ||
         Starts("/gestioncatalogo") ||
         Starts("/gestionpedidos") ||
         Starts("/gestionadministradores") ||
+        Starts("/gestionvendedores") ||
+        Starts("/gestionrepartidores") ||
         Starts("/editarproducto") ||
         Starts("/admin/producto/editar") ||
         Starts("/nuevoproducto") ||

@@ -127,7 +127,7 @@ namespace MauiBlazorDelivery.Services
         }
     }
 
-    // DTOs sin cambios...
+    // DTOs 
 }
 
 // DTOs para tu aplicación MAUI
@@ -145,7 +145,7 @@ public class ProductoDto
         public string? Nombre { get; set; }
         public string? Descripcion { get; set; }
         public decimal Precio { get; set; }
-        // Para imágenes necesitarás manejar multipart/form-data por separado
+        // Para imágenes se necesita manejar multipart/form-data por separado
     }
 
     // Modelo que coincide con tu API (para deserialización)

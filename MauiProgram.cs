@@ -1,8 +1,8 @@
-﻿using System;
+﻿#pragma warning disable CA1416
+using System;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using Microsoft.AspNetCore.Components.WebView.Maui;
@@ -11,16 +11,15 @@ namespace MauiBlazorDelivery;
 
 public static class MauiProgram
 {
+    public static readonly bool DemoMode = false;
+
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
 
         builder
             .UseMauiApp<App>()
-            .ConfigureFonts(fonts =>
-            {
-                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-            });
+            .ConfigureFonts(f => f.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"));
 
         builder.Services.AddMauiBlazorWebView();
 
@@ -29,61 +28,55 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
 
-        // ✅ ESTADO GLOBAL
         builder.Services.AddSingleton<MauiBlazorDelivery.Services.AppState>();
 
-        // ✅ BASE URL POR PLATAFORMA
-        var baseUrl = GetBaseUrl();
+        var baseUrl = ResolveBaseUrl();
+        builder.Services.AddSingleton(new MauiBlazorDelivery.Services.SignalRService(baseUrl));
+        Console.WriteLine($"[DEBUG] Using base URL: {baseUrl}");
 
-        // ✅ HTTP CLIENT FACTORY
-        builder.Services
-            .AddHttpClient("Api", client =>
-            {
-                client.BaseAddress = new Uri(baseUrl);
-                client.Timeout = TimeSpan.FromSeconds(100);
-            })
-#if DEBUG
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => true
-            })
-#endif
-            ;
-
-        // ✅ HTTP CLIENT POR DEFECTO
-        builder.Services.AddScoped(sp =>
+        builder.Services.AddHttpClient("Api", c =>
         {
-            var factory = sp.GetRequiredService<IHttpClientFactory>();
-            return factory.CreateClient("Api");
+            c.BaseAddress = new Uri(baseUrl);      // ¡con "/" final!
+            c.Timeout = TimeSpan.FromSeconds(20);
+            c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() =>
+        {
+#if DEBUG
+            return new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (req, cert, chain, errors) => true
+            };
+#else
+            return new HttpClientHandler();
+#endif
         });
 
-        // ✅ TODOS LOS SERVICIOS (SIEMPRE, NO SOLO EN DEBUG)
+        builder.Services.AddScoped(sp =>
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
+
         builder.Services.AddScoped<MauiBlazorDelivery.Services.AuthService>();
-        builder.Services.AddScoped<MauiBlazorDelivery.Services.ProductoService>();
         builder.Services.AddScoped<MauiBlazorDelivery.Services.PedidosService>();
         builder.Services.AddScoped<MauiBlazorDelivery.Services.ClienteService>();
-        builder.Services.AddScoped<MauiBlazorDelivery.Services.AdminService>(); // ⭐ MOVIDO FUERA DEL #if DEBUG
-
-        // ✅ CONFIG OPCIONAL
-        builder.Services.Configure<ApiSettings>(o => o.BaseUrl = baseUrl.TrimEnd('/'));
+        builder.Services.AddScoped<MauiBlazorDelivery.Services.ProductoService>();
+        builder.Services.AddScoped<MauiBlazorDelivery.Services.AdminService>();
+        builder.Services.AddScoped<MauiBlazorDelivery.Services.VendedorService>();
+        builder.Services.AddScoped<MauiBlazorDelivery.Services.RepartidorService>();
+        builder.Services.AddScoped<MauiBlazorDelivery.Services.PreRegistroService>();
+        builder.Services.AddScoped<MauiBlazorDelivery.Services.RecuperarContrasenaService>();
 
         return builder.Build();
     }
 
-    private static string GetBaseUrl()
+    private static string ResolveBaseUrl()
     {
-        const string LOCAL_IP = "192.168.1.105"; // tu IP LAN (para Android/iOS si hace falta)
-
-#if WINDOWS || MACCATALYST
-    return "https://localhost:7189/";        // 👈 coincide con el certificado dev
-#elif ANDROID || IOS
-        return $"https://{LOCAL_IP}:7189/";
+#if ANDROID
+        return "http://192.168.0.13:5224/";   // casa  ← cambiar a 192.168.4.144 en trabajo
+#elif DEBUG
+        return "https://localhost:7189/";
 #else
-    return $"https://{LOCAL_IP}:7189/";
+        return "https://localhost:7189/";
 #endif
     }
-
 }
 
-public class ApiSettings
-{ public string BaseUrl { get; set; } = string.Empty; }

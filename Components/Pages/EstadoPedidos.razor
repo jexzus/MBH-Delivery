@@ -1,10 +1,23 @@
-﻿@page "/estadopedido"
+@page "/estadopedido"
 @using MauiBlazorDelivery.Services
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject ClienteService ClienteSvc
+@inject SignalRService SignalR
+@implements IDisposable
 
 <h2 class="mb-3">Mis Pedidos</h2>
+
+@if (_mostrarToast)
+{
+    <div class="app-toast">
+        <div class="app-toast-body">
+            <div class="app-toast-title">@_toastTitulo</div>
+            @_toastTexto
+        </div>
+        <button class="app-toast-close" @onclick="CerrarToast">×</button>
+    </div>
+}
 
 @if (!string.IsNullOrEmpty(_error))
 {
@@ -20,23 +33,22 @@
 else
 {
     <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
-        <!-- Filtro por estado -->
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <div class="dropdownish">
-                <button type="button" class="btn btn-edit-orange dropdownish-toggle" @onclick="ToggleFiltroMenu">
-                    Filtrar: @_filtroTexto ▾
-                </button>
-                @if (_filtroMenuAbierto)
-                {
-                    <ul class="dropdownish-menu">
-                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Pendiente))">Pendiente</button></li>
-                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnPreparacion))">En preparación</button></li>
-                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnReparto))">En reparto</button></li>
-                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Entregado))">Entregado</button></li>
-                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Todos))">Todos</button></li>
-                    </ul>
-                }
-            </div>
+        <div class="dropdownish">
+            <button type="button" class="btn btn-edit-orange dropdownish-toggle" @onclick="ToggleFiltroMenu">
+                Filtrar: @_filtroTexto ▾
+            </button>
+            @if (_filtroMenuAbierto)
+            {
+                <ul class="dropdownish-menu" role="menu">
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Activos))">Activos</button></li>
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Pendiente))">Pendiente</button></li>
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnPreparacion))">En preparación</button></li>
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnReparto))">En reparto</button></li>
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.ParaRetirar))">Listo para retirar</button></li>
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Entregado))">Entregado</button></li>
+                    <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Todos))">Todos</button></li>
+                </ul>
+            }
         </div>
     </div>
 
@@ -46,36 +58,85 @@ else
     }
     else
     {
-        <div class="table-responsive mt-3">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Fecha</th>
-                        <th>Estado</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var p in Filtrados)
-                    {
-                        <tr class="@(p.EstadoPedido == "Entregado" ? "row-entregado" : "")">
-                            <td>@p.NumPedido</td>
-                            <td>@p.FechaPedido.ToString("dd/MM/yyyy HH:mm")</td>
-                            <td>
-                                <span class="@(p.EstadoPedido switch {
-                                        "Pendiente" => "chip chip-pendiente",
-                                        "En preparación" => "chip chip-prep",
-                                        "En reparto" => "chip chip-reparto",
-                                        "Entregado" => "chip chip-entregado",
-                                        _ => "chip"
-                                })">@p.EstadoPedido</span>
-                            </td>
-                            <td>$ @p.MontoTotal.ToString("N2")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="mt-3">
+            @foreach (var p in Filtrados)
+            {
+                <div class="card mb-4 shadow-sm @(p.EstadoPedido == "Entregado" ? "border-success" : "")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>Pedido #@p.NumPedido</strong>
+                                <div class="text-muted small">@p.FechaPedido.ToString("dd/MM/yyyy HH:mm")</div>
+                            </div>
+                            <div class="text-end">
+                                <strong>$ @p.MontoTotal.ToString("N2")</strong>
+                            </div>
+                        </div>
+
+                        @* ── Línea de tiempo ─────────────────────────────── *@
+                        @{
+                            var pasos = ObtenerPasos(p);
+                        }
+                        <div class="order-timeline mt-3">
+                            @for (int i = 0; i < pasos.Count; i++)
+                            {
+                                var paso = pasos[i];
+                                <div class="timeline-step @(paso.Activo ? "active" : "") @(paso.Completado ? "done" : "")">
+                                    <div class="timeline-icon">
+                                        @if (paso.Completado) { <span>✓</span> }
+                                        else if (paso.Activo) { <span class="dot-pulse"></span> }
+                                        else { <span>○</span> }
+                                    </div>
+                                    <div class="timeline-label">@paso.Label</div>
+                                </div>
+                                @if (i < pasos.Count - 1)
+                                {
+                                    <div class="timeline-line @(paso.Completado ? "done" : "")"></div>
+                                }
+                            }
+                        </div>
+
+                        <div class="mt-2 text-center">
+                            <span class="@ChipClass(p.EstadoPedido)">@EtiquetaEstado(p.EstadoPedido)</span>
+                        </div>
+
+                        @if (p.EstadoPedido == "Pendiente")
+                        {
+                            <div class="mt-3 text-center">
+                                <button class="btn btn-gradient-red"
+                                        @onclick="() => _confirmCancelarPedido = p.NumPedido">
+                                    Cancelar pedido
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (_confirmCancelarPedido is not null)
+    {
+        <div class="modal-backdrop-custom" @onclick="() => { _confirmCancelarPedido = null; _errorCancelar = null; }"></div>
+        <div class="modal-custom">
+            <h5>¿Cancelar pedido #@_confirmCancelarPedido?</h5>
+            <p class="text-muted">Esta acción no se puede deshacer.</p>
+            @if (_errorCancelar is not null)
+            {
+                <div class="alert alert-danger py-1">@_errorCancelar</div>
+            }
+            <div class="d-flex gap-2 justify-content-end mt-3">
+                <button class="btn btn-secondary btn-sm"
+                        disabled="@_cancelando"
+                        @onclick="() => { _confirmCancelarPedido = null; _errorCancelar = null; }">
+                    Volver
+                </button>
+                <button class="btn btn-danger btn-sm"
+                        disabled="@_cancelando"
+                        @onclick="ConfirmarCancelAsync">
+                    @(_cancelando ? "Cancelando..." : "Sí, cancelar")
+                </button>
+            </div>
         </div>
     }
 
@@ -90,61 +151,173 @@ else
     private string? _error;
     private List<ClienteService.PedidoDto> _pedidos = new();
 
-    // Filtro
-    private enum EstadoFiltro { Pendiente, EnPreparacion, EnReparto, Entregado, Todos }
-    private EstadoFiltro _filtro = EstadoFiltro.Pendiente;
+    private int? _confirmCancelarPedido;
+    private bool _cancelando;
+    private string? _errorCancelar;
+
+    private bool _mostrarToast;
+    private string _toastTitulo = "";
+    private string _toastTexto = "";
+    private System.Timers.Timer? _toastTimer;
+
+    private enum EstadoFiltro { Activos, Pendiente, EnPreparacion, EnReparto, ParaRetirar, Entregado, Todos }
+    private EstadoFiltro _filtro = EstadoFiltro.Activos;
     private bool _filtroMenuAbierto = false;
 
     private string _filtroTexto => _filtro switch
     {
+        EstadoFiltro.Activos => "Activos",
         EstadoFiltro.Pendiente => "Pendiente",
         EstadoFiltro.EnPreparacion => "En preparación",
         EstadoFiltro.EnReparto => "En reparto",
+        EstadoFiltro.ParaRetirar => "Listo para retirar",
         EstadoFiltro.Entregado => "Entregado",
         _ => "Todos"
     };
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Auth.EstaLogueado || Auth.EsAdmin)
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
+        if (!Auth.EstaLogueado || !Auth.EsCliente)
+        { Nav.NavigateTo("/login"); return; }
 
         try
         {
-            // 👇 si IdUsuario es 0 probablemente tu login no está devolviendo el id
             if (Auth.IdUsuario <= 0)
-            {
-                _error = "No se pudo determinar el usuario. Vuelve a iniciar sesión.";
-                return;
-            }
+            { _error = "No se pudo determinar el usuario. Volvé a iniciar sesión."; return; }
 
             _pedidos = await ClienteSvc.GetMisPedidosAsync(Auth.IdUsuario);
+            SignalR.EstadoCambiadoGlobal += OnEstadoCambiado;
         }
         catch (Exception ex)
         {
             _error = "No se pudieron cargar tus pedidos.";
             Console.WriteLine(ex);
         }
-        finally
-        {
-            _cargando = false;
-        }
+        finally { _cargando = false; }
     }
 
-    private IEnumerable<ClienteService.PedidoDto> Filtrados => _pedidos.Where(p => CoincideFiltro(p));
+    private void OnEstadoCambiado(int numPedido, string nuevoEstado)
+    {
+        var p = _pedidos.FirstOrDefault(x => x.NumPedido == numPedido);
+        if (p is null) return;
+        p.EstadoPedido = nuevoEstado;
+        InvokeAsync(() => MostrarToast("Pedido actualizado", $"Pedido #{numPedido} → {EtiquetaEstado(nuevoEstado)}"));
+    }
+
+    public void Dispose()
+    {
+        SignalR.EstadoCambiadoGlobal -= OnEstadoCambiado;
+        _toastTimer?.Dispose();
+    }
+
+    private void MostrarToast(string titulo, string texto)
+    {
+        _toastTitulo = titulo;
+        _toastTexto = texto;
+        _mostrarToast = true;
+        StateHasChanged();
+
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(3000) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) => { _mostrarToast = false; InvokeAsync(StateHasChanged); };
+        _toastTimer.Start();
+    }
+
+    private void CerrarToast() { _mostrarToast = false; _toastTimer?.Stop(); }
+
+    private IEnumerable<ClienteService.PedidoDto> Filtrados => _pedidos.Where(CoincideFiltro)
+        .OrderByDescending(p => p.FechaPedido);
 
     private bool CoincideFiltro(ClienteService.PedidoDto p) => _filtro switch
     {
-        EstadoFiltro.Pendiente      => string.Equals(p.EstadoPedido, "Pendiente", StringComparison.OrdinalIgnoreCase),
-        EstadoFiltro.EnPreparacion  => string.Equals(p.EstadoPedido, "En preparación", StringComparison.OrdinalIgnoreCase),
-        EstadoFiltro.EnReparto      => string.Equals(p.EstadoPedido, "En reparto", StringComparison.OrdinalIgnoreCase),
-        EstadoFiltro.Entregado      => string.Equals(p.EstadoPedido, "Entregado", StringComparison.OrdinalIgnoreCase),
-        EstadoFiltro.Todos          => true,
-        _                           => true
+        EstadoFiltro.Activos       => p.EstadoPedido != "Entregado" && p.EstadoPedido != "Cancelado",
+        EstadoFiltro.Pendiente     => string.Equals(p.EstadoPedido, "Pendiente", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.EnPreparacion => string.Equals(p.EstadoPedido, "En preparación", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(p.EstadoPedido, "EsperandoRepartidor", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.EnReparto     => string.Equals(p.EstadoPedido, "En reparto", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.ParaRetirar   => string.Equals(p.EstadoPedido, "Para retirar", StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.Entregado     => string.Equals(p.EstadoPedido, "Entregado", StringComparison.OrdinalIgnoreCase),
+        _ => true
     };
+
+    // ── Línea de tiempo ──────────────────────────────────────────────────
+
+    private record TimelinePaso(string Label, bool Completado, bool Activo);
+
+    private List<TimelinePaso> ObtenerPasos(ClienteService.PedidoDto p)
+    {
+        bool esDomicilio = string.Equals(p.ModoEntrega, "Domicilio", StringComparison.OrdinalIgnoreCase)
+                        || string.IsNullOrEmpty(p.ModoEntrega);
+
+        // Secuencia de estados en orden
+        var secuencia = esDomicilio
+            ? new[] { "Pendiente", "En preparación", "En reparto", "Entregado" }
+            : new[] { "Pendiente", "En preparación", "Para retirar", "Entregado" };
+
+        int idxActual = Array.IndexOf(secuencia, p.EstadoPedido);
+        if (idxActual < 0) idxActual = p.EstadoPedido == "EsperandoRepartidor" ? 2 : 0;
+
+        var pasos = new List<TimelinePaso>();
+        for (int i = 0; i < secuencia.Length; i++)
+        {
+            bool completado = i < idxActual || p.EstadoPedido == "Entregado";
+            bool activo = i == idxActual && p.EstadoPedido != "Entregado";
+
+            var label = secuencia[i] switch
+            {
+                "Pendiente" => "Recibido",
+                "En preparación" => "En cocina",
+                "En reparto" => "En camino",
+                "Para retirar" => "Listo para retirar",
+                "Entregado" => "Entregado ✓",
+                _ => secuencia[i]
+            };
+            pasos.Add(new TimelinePaso(label, completado, activo));
+        }
+        return pasos;
+    }
+
+    private string ChipClass(string estado) => estado switch
+    {
+        "Pendiente" => "chip chip-pendiente",
+        "En preparación" => "chip chip-prep",
+        "EsperandoRepartidor" => "chip chip-espera",
+        "En reparto" => "chip chip-reparto",
+        "Entregado" => "chip chip-entregado",
+        "Cancelado" => "chip chip-cancelado",
+        "Para retirar" => "chip chip-retirar",
+        _ => "chip"
+    };
+
+    private string EtiquetaEstado(string estado) => estado switch
+    {
+        "EsperandoRepartidor" => "Buscando repartidor",
+        _ => estado
+    };
+
+    private async Task ConfirmarCancelAsync()
+    {
+        if (_confirmCancelarPedido is null) return;
+        _cancelando = true;
+        _errorCancelar = null;
+
+        var error = await ClienteSvc.CancelarPedidoAsync(_confirmCancelarPedido.Value, Auth.IdUsuario);
+
+        if (error is null)
+        {
+            var p = _pedidos.FirstOrDefault(x => x.NumPedido == _confirmCancelarPedido.Value);
+            if (p is not null) p.EstadoPedido = "Cancelado";
+            var num = _confirmCancelarPedido.Value;
+            _confirmCancelarPedido = null;
+            MostrarToast("Pedido cancelado", $"Tu pedido #{num} fue cancelado.");
+        }
+        else
+        {
+            _errorCancelar = error;
+        }
+
+        _cancelando = false;
+    }
 
     private void ToggleFiltroMenu() => _filtroMenuAbierto = !_filtroMenuAbierto;
     private void CambiarFiltro(EstadoFiltro f) { _filtro = f; _filtroMenuAbierto = false; }

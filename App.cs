@@ -1,30 +1,24 @@
 ﻿using Microsoft.AspNetCore.Components.WebView.Maui;
+using Microsoft.Maui.Controls;
 
 namespace MauiBlazorDelivery;
 
 public class App : Application
 {
-    protected override Window CreateWindow(IActivationState? activationState)
+    public App()
     {
-        var contentPage = new ContentPage();
-        var blazorWebView = new BlazorWebView
+        var blazor = new BlazorWebView
         {
             HostPage = "wwwroot/index.html",
-            // 👇 Arranca SIEMPRE en /login
-            StartPath = "/login"
+            StartPath = "/login",
         };
 
-        blazorWebView.RootComponents.Add(new RootComponent
+        blazor.RootComponents.Add(new RootComponent
         {
             Selector = "#app",
             ComponentType = typeof(Components.App)
         });
 
-        contentPage.Content = blazorWebView;
-
-        return new Window(contentPage)
-        {
-            Title = "MauiBlazorDelivery"
-        };
+        MainPage = new ContentPage { Content = blazor };
     }
 }

@@ -1,0 +1,34 @@
+@page "/panelvendedor"
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.AuthService Auth
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!Auth.EstaLogueado || !Auth.EsVendedor)
+            Nav.NavigateTo("/login");
+    }
+
+    string NombreUsuario => Auth.UsuarioActual?.NombreUsuario ?? "Vendedor";
+
+    void IrGestionPedidos() => Nav.NavigateTo("/gestionpedidos");
+    void IrGestionCatalogo() => Nav.NavigateTo("/gestioncatalogo");
+    void CerrarSesion() { Auth.Logout(); Nav.NavigateTo("/login", true); }
+}
+
+<div class="admin-panel">
+    <h2 class="admin-title">Bienvenido <span class="admin-name">@NombreUsuario</span></h2>
+
+    <div class="admin-actions">
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionPedidos">
+            Gestión de pedidos
+        </button>
+        <button type="button" class="btn btn-gradient-orange" @onclick="IrGestionCatalogo">
+            Gestión de catálogo
+        </button>
+    </div>
+
+    <button type="button" class="btn btn-gradient-red admin-logout" @onclick="CerrarSesion">
+        Cerrar sesión
+    </button>
+</div>

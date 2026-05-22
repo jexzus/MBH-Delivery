@@ -1,0 +1,289 @@
+@page "/gestionvendedores"
+@inject NavigationManager Nav
+@inject MauiBlazorDelivery.Services.AuthService Auth
+@inject MauiBlazorDelivery.Services.VendedorService VendedorSvc
+@inject MauiBlazorDelivery.Services.AdminService AdminSvc
+@using MauiBlazorDelivery.Services
+
+<div class="admin-panel">
+    <div class="d-flex align-items-center mb-3 gap-2">
+        <button class="btn btn-gradient-red" @onclick="@(() => Nav.NavigateTo("/paneladmin"))">← Volver</button>
+        <h3 class="m-0">Gestión de Vendedores</h3>
+    </div>
+
+    @if (_cargando)
+    {
+        <div class="text-center py-4"><span>Cargando...</span></div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <button class="btn btn-gradient-green" @onclick="AbrirModalCrear">+ Nuevo vendedor</button>
+        </div>
+
+        @if (_vendedores.Count == 0)
+        {
+            <p class="text-muted">No hay vendedores registrados.</p>
+        }
+        else
+        {
+            @foreach (var v in _vendedores)
+            {
+                <div class="gp-card">
+                    <div class="gp-card-head">
+                        <strong>@v.NombreUsuario</strong>
+                        <span class="@(v.Activo ? "chip-entregado" : "chip-pendiente")">@(v.Activo ? "Activo" : "Inactivo")</span>
+                    </div>
+                    <div class="gp-card-body">
+                        <div class="gp-row"><span class="gp-label">Nombre</span><span>@v.Nombre @v.Apellido</span></div>
+                        <div class="gp-row"><span class="gp-label">Alta</span><span>@v.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy")</span></div>
+                    </div>
+                    <div class="gp-card-actions">
+                        <button class="btn btn-edit-orange gp-btn" @onclick="@(() => AbrirModalEditar(v))">Editar</button>
+                        <button class="btn btn-gradient-red gp-btn" @onclick="@(() => AbrirModalEliminar(v))">Eliminar</button>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@* Modal Crear/Editar *@
+@if (_modalAbierto)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarModal"></div>
+    <div class="modal-custom" role="dialog" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h5 class="modal-title">@(_editando is null ? "Nuevo vendedor" : "Editar vendedor")</h5>
+        </div>
+        <div class="modal-body">
+            @if (_editando is null)
+            {
+                <div class="mb-2">
+                    <label class="form-label">Usuario (ID o nombre)</label>
+                    <select class="form-select" @bind="_idUsuarioSeleccionado">
+                        <option value="0">-- Seleccionar --</option>
+                        @foreach (var u in _usuarios)
+                        {
+                            <option value="@u.Id">@u.NombreUsuario (@u.Rol)</option>
+                        }
+                    </select>
+                </div>
+            }
+            <div class="mb-2">
+                <label class="form-label">Nombre</label>
+                <input class="form-control" @bind="_formNombre" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Apellido</label>
+                <input class="form-control" @bind="_formApellido" />
+            </div>
+            <div class="mb-2 form-check">
+                <input class="form-check-input" type="checkbox" @bind="_formActivo" id="chkActivo" />
+                <label class="form-check-label" for="chkActivo">Activo</label>
+            </div>
+            @if (_editando is not null)
+            {
+                <div class="mb-2">
+                    <label class="form-label">Nueva contraseña <span class="text-muted">(opcional)</span></label>
+                    <input type="password" class="form-control" @bind="_formNuevaPass" placeholder="Dejar vacío para no cambiar" />
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_errorModal))
+            {
+                <div class="alert alert-danger mt-2">@_errorModal</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarModal" disabled="@_trabajando">Cancelar</button>
+            <button class="btn btn-pill btn-grad-confirmar" @onclick="GuardarAsync" disabled="@_trabajando">
+                @(_trabajando ? "Guardando..." : "Guardar")
+            </button>
+        </div>
+    </div>
+}
+
+@* Modal Eliminar *@
+@if (_modalEliminarAbierto)
+{
+    <div class="modal-backdrop-custom" @onclick="CerrarModalEliminar"></div>
+    <div class="modal-custom" role="dialog" @onclick:stopPropagation="true">
+        <div class="modal-header"><h5 class="modal-title">Eliminar vendedor</h5></div>
+        <div class="modal-body">
+            <p>¿Eliminar a <strong>@_vendedorAEliminar?.NombreUsuario</strong>? El usuario volverá al rol <em>cliente</em>.</p>
+            @if (!string.IsNullOrWhiteSpace(_errorModal))
+            {
+                <div class="alert alert-danger">@_errorModal</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarModalEliminar" disabled="@_trabajando">Cancelar</button>
+            <button class="btn btn-pill btn-gradient-red" @onclick="EliminarAsync" disabled="@_trabajando">
+                @(_trabajando ? "Eliminando..." : "Eliminar")
+            </button>
+        </div>
+    </div>
+}
+
+@* Toast *@
+@if (_mostrarToast)
+{
+    <div class="app-toast">
+        <div class="app-toast-body">
+            <div class="app-toast-title">Éxito</div>
+            @_toastText
+        </div>
+        <button class="app-toast-close" @onclick="CerrarToast">×</button>
+    </div>
+}
+
+@code {
+    private List<VendedorService.VendedorDto> _vendedores = new();
+    private List<VendedorService.UsuarioSimpleDto> _usuarios = new();
+    private bool _cargando = true;
+
+    private bool _modalAbierto;
+    private bool _modalEliminarAbierto;
+    private VendedorService.VendedorDto? _editando;
+    private VendedorService.VendedorDto? _vendedorAEliminar;
+
+    private int _idUsuarioSeleccionado;
+    private string _formNombre = "";
+    private string _formApellido = "";
+    private bool _formActivo = true;
+    private string _formNuevaPass = "";
+    private string? _errorModal;
+    private bool _trabajando;
+
+    private bool _mostrarToast;
+    private string _toastText = "";
+    private System.Timers.Timer? _toastTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.EstaLogueado || !Auth.EsAdmin)
+        { Nav.NavigateTo("/login"); return; }
+
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _vendedores = await VendedorSvc.GetTodosAsync();
+        _cargando = false;
+    }
+
+    private async Task AbrirModalCrear()
+    {
+        _editando = null;
+        _idUsuarioSeleccionado = 0;
+        _formNombre = "";
+        _formApellido = "";
+        _formActivo = true;
+        _formNuevaPass = "";
+        _errorModal = null;
+        try { _usuarios = await VendedorSvc.GetTodosUsuariosAsync(); }
+        catch { _usuarios = new(); }
+        _modalAbierto = true;
+    }
+
+    private void AbrirModalEditar(VendedorService.VendedorDto v)
+    {
+        _editando = v;
+        _formNombre = v.Nombre ?? "";
+        _formApellido = v.Apellido ?? "";
+        _formActivo = v.Activo;
+        _formNuevaPass = "";
+        _errorModal = null;
+        _modalAbierto = true;
+    }
+
+    private void AbrirModalEliminar(VendedorService.VendedorDto v)
+    {
+        _vendedorAEliminar = v;
+        _errorModal = null;
+        _modalEliminarAbierto = true;
+    }
+
+    private void CerrarModal() { _modalAbierto = false; _errorModal = null; _trabajando = false; }
+    private void CerrarModalEliminar() { _modalEliminarAbierto = false; _errorModal = null; _trabajando = false; }
+
+    private async Task GuardarAsync()
+    {
+        _trabajando = true;
+        _errorModal = null;
+
+        bool ok;
+        if (_editando is null)
+        {
+            if (_idUsuarioSeleccionado == 0)
+            { _errorModal = "Seleccioná un usuario."; _trabajando = false; return; }
+
+            ok = await VendedorSvc.CrearAsync(new VendedorService.VendedorRequest
+            {
+                IdUsuario = _idUsuarioSeleccionado,
+                Nombre = _formNombre.Trim(),
+                Apellido = _formApellido.Trim(),
+                Activo = _formActivo
+            });
+        }
+        else
+        {
+            ok = await VendedorSvc.ActualizarAsync(_editando.Id, new VendedorService.VendedorRequest
+            {
+                IdUsuario = _editando.IdUsuario,
+                Nombre = _formNombre.Trim(),
+                Apellido = _formApellido.Trim(),
+                Activo = _formActivo
+            });
+        }
+
+        _trabajando = false;
+        if (ok)
+        {
+            if (_editando is not null && !string.IsNullOrWhiteSpace(_formNuevaPass))
+            {
+                var okPass = await AdminSvc.CambiarContrasenaAsync(_editando.IdUsuario, _formNuevaPass.Trim());
+                if (!okPass) { _errorModal = "Vendedor actualizado, pero no se pudo cambiar la contraseña."; return; }
+            }
+            CerrarModal();
+            MostrarToast(_editando is null ? "Vendedor creado." : "Vendedor actualizado.");
+            await CargarAsync();
+        }
+        else
+        {
+            _errorModal = "No se pudo guardar. Verificá los datos.";
+        }
+    }
+
+    private async Task EliminarAsync()
+    {
+        if (_vendedorAEliminar is null) return;
+        _trabajando = true;
+        var ok = await VendedorSvc.EliminarAsync(_vendedorAEliminar.Id);
+        _trabajando = false;
+        if (ok)
+        {
+            CerrarModalEliminar();
+            MostrarToast("Vendedor eliminado.");
+            await CargarAsync();
+        }
+        else
+        {
+            _errorModal = "No se pudo eliminar.";
+        }
+    }
+
+    private void MostrarToast(string texto)
+    {
+        _toastText = texto;
+        _mostrarToast = true;
+        StateHasChanged();
+        _toastTimer?.Stop();
+        _toastTimer = new System.Timers.Timer(2200) { AutoReset = false };
+        _toastTimer.Elapsed += (_, __) => { _mostrarToast = false; InvokeAsync(StateHasChanged); };
+        _toastTimer.Start();
+    }
+    private void CerrarToast() { _mostrarToast = false; _toastTimer?.Stop(); }
+}
