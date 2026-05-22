@@ -25,11 +25,11 @@ public static class MauiProgram
             {
                 config.AddAndroid(android =>
                 {
-                    android.AddChannel(new Plugin.LocalNotification.AndroidSpecific.NotificationChannelRequest
+                    android.AddChannel(new Plugin.LocalNotification.AndroidOption.NotificationChannelRequest
                     {
                         Id = "delivery_channel",
                         Name = "Notificaciones de Delivery",
-                        Importance = Plugin.LocalNotification.AndroidSpecific.AndroidImportance.High,
+                        Importance = Plugin.LocalNotification.AndroidOption.AndroidImportance.High,
                         EnableVibration = true,
                         EnableSound = true,
                     });

@@ -1,5 +1,5 @@
 using Plugin.LocalNotification;
-using Plugin.LocalNotification.AndroidSpecific;
+using Plugin.LocalNotification.AndroidOption;
 
 namespace MauiBlazorDelivery.Services;
 
