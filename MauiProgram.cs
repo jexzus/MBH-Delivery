@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using Microsoft.AspNetCore.Components.WebView.Maui;
+using Plugin.LocalNotification;
 
 namespace MauiBlazorDelivery;
 
@@ -19,7 +20,21 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
-            .ConfigureFonts(f => f.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"));
+            .ConfigureFonts(f => f.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"))
+            .UseLocalNotification(config =>
+            {
+                config.AddAndroid(android =>
+                {
+                    android.AddChannel(new Plugin.LocalNotification.AndroidSpecific.NotificationChannelRequest
+                    {
+                        Id = "delivery_channel",
+                        Name = "Notificaciones de Delivery",
+                        Importance = Plugin.LocalNotification.AndroidSpecific.AndroidImportance.High,
+                        EnableVibration = true,
+                        EnableSound = true,
+                    });
+                });
+            });
 
         builder.Services.AddMauiBlazorWebView();
 
@@ -64,6 +79,7 @@ public static class MauiProgram
         builder.Services.AddScoped<MauiBlazorDelivery.Services.RepartidorService>();
         builder.Services.AddScoped<MauiBlazorDelivery.Services.PreRegistroService>();
         builder.Services.AddScoped<MauiBlazorDelivery.Services.RecuperarContrasenaService>();
+        builder.Services.AddSingleton<MauiBlazorDelivery.Services.NotificationService>();
 
         return builder.Build();
     }

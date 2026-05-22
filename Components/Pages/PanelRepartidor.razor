@@ -5,6 +5,7 @@
 @inject PedidosService PedidosSvc
 @inject RepartidorService RepartidorSvc
 @inject SignalRService SignalR
+@inject NotificationService Notif
 @implements IDisposable
 
 <h2 class="mb-2">Hola, <strong>@Auth.UsuarioActual?.NombreUsuario</strong></h2>
@@ -220,6 +221,8 @@ else
         if (!Auth.EstaLogueado || !Auth.EsRepartidor)
         { Nav.NavigateTo("/login"); return; }
 
+        await Notif.PedirPermisoAsync();
+
         SignalR.EstadoCambiadoGlobal += OnEstadoCambiado;
         SignalR.NuevoPedidoParaReparto += OnNuevoPedido;
         SignalR.CerrarAlerta += OnCerrarAlerta;
@@ -298,6 +301,10 @@ else
 
         _pedidoEntrante = dto;
         _errorAceptar = null;
+
+        Notif.Mostrar(
+            "🛵 Nueva solicitud de reparto",
+            $"Pedido #{dto.NumPedido} — {dto.Cliente} · ${dto.MontoTotal}");
 
         // Agregar a disponibles si no está
         if (!_pedidosDisponibles.Any(x => x.NumPedido == dto.NumPedido))
