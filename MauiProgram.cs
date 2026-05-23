@@ -12,8 +12,6 @@ namespace MauiBlazorDelivery;
 
 public static class MauiProgram
 {
-    public static readonly bool DemoMode = false;
-
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
@@ -32,8 +30,16 @@ public static class MauiProgram
                         Importance = Plugin.LocalNotification.AndroidOption.AndroidImportance.High,
                         EnableVibration = true,
                         EnableSound = true,
+                        LockScreenVisibility = Plugin.LocalNotification.AndroidOption.AndroidVisibilityType.Public,
                     });
                 });
+            })
+            .ConfigureMauiHandlers(handlers =>
+            {
+#if ANDROID
+                handlers.AddHandler<Microsoft.AspNetCore.Components.WebView.Maui.BlazorWebView,
+                    MauiBlazorDelivery.Platforms.Android.CustomBlazorWebViewHandler>();
+#endif
             });
 
         builder.Services.AddMauiBlazorWebView();
@@ -80,6 +86,7 @@ public static class MauiProgram
         builder.Services.AddScoped<MauiBlazorDelivery.Services.PreRegistroService>();
         builder.Services.AddScoped<MauiBlazorDelivery.Services.RecuperarContrasenaService>();
         builder.Services.AddSingleton<MauiBlazorDelivery.Services.NotificationService>();
+        builder.Services.AddSingleton<MauiBlazorDelivery.Services.ImagenCacheService>();
 
         return builder.Build();
     }

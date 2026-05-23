@@ -52,16 +52,10 @@
     <!-- Cargar imagen -->
     <div class="mb-3">
         <label class="form-label">Imagen (opcional)</label>
-
-        <!-- input file oculto + label como botón -->
-        <InputFile id="fileImagen"
-                   class="file-input-hidden"
-                   OnChange="OnFileSelected"
-                   accept=".jpg,.jpeg,.png,.gif,.webp" />
-        <label for="fileImagen" class="btn btn-pill btn-grad-file">Elegir archivo</label>
-        <span class="ms-2 align-middle">@TextoArchivoSeleccionado</span>
-
-        <ValidationMessage For="@(() => ArchivoImagen)" />
+        <div>
+            <button type="button" class="btn btn-pill btn-grad-file" @onclick="SeleccionarImagenAsync">Elegir archivo</button>
+            <span class="ms-2 align-middle">@TextoArchivoSeleccionado</span>
+        </div>
         @if (!string.IsNullOrEmpty(PreviewDataUrl))
         {
             <img src="@PreviewDataUrl" class="img-thumbnail mt-2" style="max-height:150px" />
@@ -121,9 +115,10 @@
     private string _toastTexto = "";
     private System.Timers.Timer? _toastTimer;
     private string? PreviewDataUrl;
-    private IBrowserFile? ArchivoImagen;
+    private byte[]? _imagenBytes;
+    private string? _imagenNombre;
+    private string? _imagenContentType;
 
-    // nombre archivo elegido
     private string NombreArchivoSeleccionado = string.Empty;
     private string TextoArchivoSeleccionado =>
         string.IsNullOrWhiteSpace(NombreArchivoSeleccionado)
@@ -131,35 +126,46 @@
             : NombreArchivoSeleccionado;
 
     // -------- Eventos UI --------
-    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    private async Task SeleccionarImagenAsync()
     {
+        byte[]? bytes = null;
+        string? nombre = null;
+        string? contentType = null;
+
         try
         {
-            var f = e?.File;
-            if (f is null)
+            await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                MostrarToast("Atención", "No se eligió ningún archivo.");
-                ArchivoImagen = null;
-                PreviewDataUrl = null;
-                NombreArchivoSeleccionado = string.Empty;
-                StateHasChanged();
+                var result = await MediaPicker.Default.PickPhotoAsync();
+                if (result is null) return;
+
+                nombre = result.FileName;
+                contentType = result.ContentType ?? "image/jpeg";
+
+                using var stream = await result.OpenReadAsync();
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                bytes = ms.ToArray();
+            });
+
+            if (bytes is null) return;
+
+            if (bytes.Length == 0)
+            {
+                MostrarToast("Error", "No se pudo leer la imagen. Intentá con otra.");
                 return;
             }
 
-            ArchivoImagen = f;
-            NombreArchivoSeleccionado = f.Name;
-
-            const long maxBytes = 4 * 1024 * 1024; // 4 MB
-            await using var stream = f.OpenReadStream(maxBytes);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-
-            PreviewDataUrl = $"data:{f.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+            _imagenBytes = bytes;
+            _imagenNombre = nombre;
+            _imagenContentType = contentType ?? "image/jpeg";
+            NombreArchivoSeleccionado = nombre ?? "imagen";
+            PreviewDataUrl = $"data:{_imagenContentType};base64,{Convert.ToBase64String(_imagenBytes)}";
         }
         catch (Exception ex)
         {
-            MostrarToast("Error", $"No se pudo leer la imagen: {ex.Message}");
-            ArchivoImagen = null;
+            MostrarToast("Error", $"No se pudo seleccionar la imagen: {ex.Message}");
+            _imagenBytes = null;
             PreviewDataUrl = null;
             NombreArchivoSeleccionado = string.Empty;
         }
@@ -204,7 +210,7 @@
 
             HttpResponseMessage resp;
 
-            if (ArchivoImagen is null)
+            if (_imagenBytes is null || _imagenBytes.Length == 0)
             {
                 // Sin imagen: JSON -> POST api/Producto
                 var payload = new
@@ -221,18 +227,16 @@
                 // Con imagen: multipart/form-data -> POST api/Producto/con-imagen
                 using var form = new MultipartFormDataContent();
 
-                var precioString = (Model.Precio ?? 0m).ToString("F2", CultureInfo.GetCultureInfo("es-AR"));
+                var precioString = (Model.Precio ?? 0m).ToString("F2", CultureInfo.InvariantCulture);
                 form.Add(new StringContent(Model.NombreProducto!.Trim()), "NombreProducto");
                 form.Add(new StringContent(Model.Descripcion!.Trim()), "Descripcion");
                 form.Add(new StringContent(precioString), "Precio");
 
-                var f = ArchivoImagen;
-                var stream = f.OpenReadStream(4 * 1024 * 1024);
-                var fileName = Path.GetFileName(f.Name);
+                var fileName = Path.GetFileName(_imagenNombre ?? "upload.jpg");
                 if (string.IsNullOrWhiteSpace(fileName)) fileName = "upload.jpg";
 
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue(f.ContentType);
+                var fileContent = new ByteArrayContent(_imagenBytes);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(_imagenContentType ?? "image/jpeg");
                 form.Add(fileContent, "ImagenArchivo", fileName);
 
                 resp = await Http.PostAsync("api/Producto/con-imagen", form);

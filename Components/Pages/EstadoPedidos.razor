@@ -4,7 +4,6 @@
 @inject NavigationManager Nav
 @inject ClienteService ClienteSvc
 @inject SignalRService SignalR
-@inject NotificationService Notif
 @implements IDisposable
 
 <h2 class="mb-3">Mis Pedidos</h2>
@@ -187,7 +186,6 @@ else
             { _error = "No se pudo determinar el usuario. Volvé a iniciar sesión."; return; }
 
             _pedidos = await ClienteSvc.GetMisPedidosAsync(Auth.IdUsuario);
-            await Notif.PedirPermisoAsync();
             SignalR.EstadoCambiadoGlobal += OnEstadoCambiado;
         }
         catch (Exception ex)
@@ -204,7 +202,6 @@ else
         if (p is null) return;
         p.EstadoPedido = nuevoEstado;
         var etiqueta = EtiquetaEstado(nuevoEstado);
-        Notif.Mostrar("Tu pedido fue actualizado", $"Pedido #{numPedido} → {etiqueta}");
         InvokeAsync(() => MostrarToast("Pedido actualizado", $"Pedido #{numPedido} → {etiqueta}"));
     }
 

@@ -9,6 +9,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject MauiBlazorDelivery.Services.AuthService Auth
+@inject MauiBlazorDelivery.Services.ImagenCacheService ImagenCache
 
 <h2 class="mb-3">Editar Producto</h2>
 
@@ -74,19 +75,12 @@ else
         @* Cambiar imagen *@
         <div class="mb-3">
             <label class="form-label">Cambiar imagen (opcional)</label>
-
-            <!-- input file oculto accesible + label como botón -->
-            <InputFile id="fileImagen"
-                       class="file-input-hidden"
-                       OnChange="OnFileSelected"
-                       accept=".jpg,.jpeg,.png,.gif,.webp" />
-            <label for="fileImagen" class="btn btn-pill btn-grad-file">Elegir archivo</label>
-            <span class="ms-2 align-middle">@TextoArchivoSeleccionado</span>
-
-            <ValidationMessage For="@(() => ArchivoImagen)" />
+            <div>
+                <button type="button" class="btn btn-pill btn-grad-file" @onclick="SeleccionarImagenAsync">Elegir archivo</button>
+                <span class="ms-2 align-middle">@TextoArchivoSeleccionado</span>
+            </div>
             @if (!string.IsNullOrEmpty(PreviewDataUrl))
             {
-                <!-- preview con clase global -->
                 <img src="@PreviewDataUrl" class="img-thumbnail mt-2 img-preview" />
             }
         </div>
@@ -150,25 +144,15 @@ else
     private System.Timers.Timer? _toastTimer;
     private string? ImagenActualUrl;
     private string? PreviewDataUrl;
-    private IBrowserFile? ArchivoImagen;
+    private byte[]? _imagenBytes;
+    private string? _imagenNombre;
+    private string? _imagenContentType;
 
-    // nombre del archivo elegido (para mostrar al lado del botón)
     private string NombreArchivoSeleccionado = string.Empty;
-
-    // Texto seguro para el span (evita el CS1662 en Razor)
     private string TextoArchivoSeleccionado =>
         string.IsNullOrWhiteSpace(NombreArchivoSeleccionado)
             ? "No se eligió ningún archivo"
             : NombreArchivoSeleccionado;
-
-    // -------- Helpers --------
-    private string ConstruirImagenUrl(string? nombreArchivo)
-    {
-        if (string.IsNullOrWhiteSpace(nombreArchivo)) return "";
-        var baseUrl = Http.BaseAddress?.ToString() ?? "";
-        if (!baseUrl.EndsWith("/")) baseUrl += "/";
-        return $"{baseUrl}imagenes/{nombreArchivo}";
-    }
 
     // -------- Ciclo de vida --------
     protected override async Task OnInitializedAsync()
@@ -183,8 +167,7 @@ else
             }
 
             Model = prod;
-            ImagenActualUrl = ConstruirImagenUrl(prod.Imagen);
-            Console.WriteLine($"[CLIENT] Producto cargado - Precio: {Model.Precio}");
+            ImagenActualUrl = await ImagenCache.GetDataUrlAsync(prod.Imagen);
         }
         catch (Exception ex)
         {
@@ -197,33 +180,46 @@ else
     }
 
     // -------- Eventos UI --------
-    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    private async Task SeleccionarImagenAsync()
     {
+        byte[]? bytes = null;
+        string? nombre = null;
+        string? contentType = null;
+
         try
         {
-            var f = e?.File;
-            if (f is null)
+            await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                ArchivoImagen = null;
-                PreviewDataUrl = null;
-                NombreArchivoSeleccionado = string.Empty;
+                var result = await MediaPicker.Default.PickPhotoAsync();
+                if (result is null) return;
+
+                nombre = result.FileName;
+                contentType = result.ContentType ?? "image/jpeg";
+
+                using var stream = await result.OpenReadAsync();
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                bytes = ms.ToArray();
+            });
+
+            if (bytes is null) return;
+
+            if (bytes.Length == 0)
+            {
+                MostrarToast("Error", "No se pudo leer la imagen. Intentá con otra.");
                 return;
             }
 
-            ArchivoImagen = f;
-            NombreArchivoSeleccionado = f.Name;
-
-            const long maxBytes = 4 * 1024 * 1024; // 4 MB
-            await using var stream = f.OpenReadStream(maxBytes);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-
-            PreviewDataUrl = $"data:{f.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+            _imagenBytes = bytes;
+            _imagenNombre = nombre;
+            _imagenContentType = contentType ?? "image/jpeg";
+            NombreArchivoSeleccionado = nombre ?? "imagen";
+            PreviewDataUrl = $"data:{_imagenContentType};base64,{Convert.ToBase64String(_imagenBytes)}";
         }
         catch (Exception ex)
         {
-            MostrarToast("Error", $"No se pudo leer la imagen: {ex.Message}");
-            ArchivoImagen = null;
+            MostrarToast("Error", $"No se pudo seleccionar la imagen: {ex.Message}");
+            _imagenBytes = null;
             PreviewDataUrl = null;
             NombreArchivoSeleccionado = string.Empty;
         }
@@ -260,10 +256,7 @@ else
         {
             HttpResponseMessage resp;
 
-            Console.WriteLine($"[CLIENT] Antes de enviar - Precio en Model: {Model.Precio}");
-            Console.WriteLine($"[CLIENT] Tiene imagen: {ArchivoImagen != null}");
-
-            if (ArchivoImagen is null)
+            if (_imagenBytes is null || _imagenBytes.Length == 0)
             {
                 // Sin imagen: JSON
                 var payload = new
@@ -275,7 +268,6 @@ else
                     Imagen = Model.Imagen
                 };
 
-                Console.WriteLine($"[CLIENT] JSON Payload - Precio: {payload.Precio}");
                 resp = await Http.PutAsJsonAsync($"api/producto/{Id}", payload);
             }
             else
@@ -283,28 +275,19 @@ else
                 // Con imagen: multipart/form-data
                 using var form = new MultipartFormDataContent();
 
-                var precioValue = Model.Precio ?? 0m;
-                var precioString = precioValue.ToString("F2", CultureInfo.GetCultureInfo("es-AR"));
-
-                Console.WriteLine($"[CLIENT] Multipart - Precio decimal: {precioValue}");
-                Console.WriteLine($"[CLIENT] Multipart - Precio string (es-AR): '{precioString}'");
+                var precioString = (Model.Precio ?? 0m).ToString("F2", CultureInfo.InvariantCulture);
 
                 form.Add(new StringContent(Model.IdProducto.ToString()), "IdProducto");
                 form.Add(new StringContent(Model.NombreProducto ?? ""), "NombreProducto");
                 form.Add(new StringContent(Model.Descripcion ?? ""), "Descripcion");
                 form.Add(new StringContent(precioString), "Precio");
 
-                var f = ArchivoImagen; // local
-                var stream = f!.OpenReadStream(4 * 1024 * 1024);
-                var fileName = Path.GetFileName(f.Name);
+                var fileName = Path.GetFileName(_imagenNombre ?? "upload.jpg");
                 if (string.IsNullOrWhiteSpace(fileName)) fileName = "upload.jpg";
 
-                var fileContent = new StreamContent(stream);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue(f.ContentType);
+                var fileContent = new ByteArrayContent(_imagenBytes);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(_imagenContentType ?? "image/jpeg");
                 form.Add(fileContent, "ImagenArchivo", fileName);
-
-                Console.WriteLine($"[CLIENT] PUT -> {Http.BaseAddress}api/producto/{Id}/con-imagen");
-                Console.WriteLine($"[CLIENT] Archivo: {fileName}, Tamaño: {f.Size / 1024.0:F1} KB");
 
                 resp = await Http.PutAsync($"api/producto/{Id}/con-imagen", form);
             }
@@ -322,9 +305,11 @@ else
             {
                 Console.WriteLine($"[CLIENT] Respuesta del servidor - Precio: {actualizado.Precio}");
                 Model = actualizado;
-                ImagenActualUrl = ConstruirImagenUrl(actualizado.Imagen);
+                ImagenActualUrl = await ImagenCache.GetDataUrlAsync(actualizado.Imagen);
                 PreviewDataUrl = null;
-                ArchivoImagen = null;
+                _imagenBytes = null;
+                _imagenNombre = null;
+                _imagenContentType = null;
                 NombreArchivoSeleccionado = string.Empty;
             }
 

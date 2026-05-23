@@ -1,17 +1,16 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject MauiBlazorDelivery.Services.AuthService AuthService
+@inject MauiBlazorDelivery.Services.SignalRService SignalR
+@inject MauiBlazorDelivery.Services.NotificationService Notif
+@implements IDisposable
 
 @code {
-    // Ruta actual (solo path)
     string Path => new Uri(Nav.Uri).AbsolutePath;
-
     bool Starts(string prefix) => Path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
 
-    // Páginas de autenticación
     bool IsAuthPage => Starts("/login") || Starts("/registro");
 
-    // Workspace Admin (sin topbar)
     bool IsAdminWorkspace =>
         Starts("/paneladmin") ||
         Starts("/panelrepartidor") ||
@@ -26,19 +25,75 @@
         Starts("/nuevoproducto") ||
         Starts("/admin/producto/nuevo");
 
-    // Workspace Cliente (también sin topbar)
     bool IsClientWorkspace =>
         Starts("/catalogo") ||
         Starts("/carrito") ||
         Starts("/estadopedido");
 
-    // Topbar solo fuera de auth, admin y cliente
     bool ShowTopbar => !IsAuthPage && !IsAdminWorkspace && !IsClientWorkspace;
+
+    private bool _notifSubscribed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        await TrySubscribeNotifAsync();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+        => _ = TrySubscribeNotifAsync();
+
+    private async Task TrySubscribeNotifAsync()
+    {
+        if (_notifSubscribed || !AuthService.EstaLogueado) return;
+
+        await Notif.PedirPermisoAsync();
+
+        if (AuthService.EsCliente)
+            SignalR.EstadoCambiadoGlobal += OnEstadoCambiadoCliente;
+
+        if (AuthService.EsRepartidor)
+            SignalR.NuevoPedidoParaReparto += OnNuevoPedidoRepartidor;
+
+        Notif.NotificacionTocada += OnNotificacionTocada;
+        _notifSubscribed = true;
+    }
+
+    private void OnNotificacionTocada(string data)
+    {
+        InvokeAsync(() =>
+        {
+            if (data == "cliente")
+                Nav.NavigateTo("/estadopedido");
+            else if (data == "repartidor")
+                Nav.NavigateTo("/panelrepartidor");
+        });
+    }
+
+    private void OnEstadoCambiadoCliente(int numPedido, string nuevoEstado)
+    {
+        var etiqueta = nuevoEstado == "EsperandoRepartidor" ? "Buscando repartidor" : nuevoEstado;
+        Notif.Mostrar("Tu pedido fue actualizado", $"Pedido #{numPedido} → {etiqueta}", "cliente");
+    }
+
+    private void OnNuevoPedidoRepartidor(SignalRService.NuevoPedidoDto dto)
+    {
+        Notif.Mostrar("🛵 Nueva solicitud de reparto",
+            $"Pedido #{dto.NumPedido} — {dto.Cliente} · ${dto.MontoTotal}", "repartidor");
+    }
 
     void CerrarSesion()
     {
         AuthService.Logout();
         Nav.NavigateTo("/login", true);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        SignalR.EstadoCambiadoGlobal -= OnEstadoCambiadoCliente;
+        SignalR.NuevoPedidoParaReparto -= OnNuevoPedidoRepartidor;
+        Notif.NotificacionTocada -= OnNotificacionTocada;
     }
 }
 

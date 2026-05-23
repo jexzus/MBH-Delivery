@@ -178,7 +178,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Auth.EstaLogueado || Auth.EsAdmin)
+        if (!Auth.EstaLogueado || !Auth.EsCliente)
         {
             Nav.NavigateTo("/login");
             return;

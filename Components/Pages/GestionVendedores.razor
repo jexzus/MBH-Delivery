@@ -4,49 +4,71 @@
 @inject MauiBlazorDelivery.Services.VendedorService VendedorSvc
 @inject MauiBlazorDelivery.Services.AdminService AdminSvc
 @using MauiBlazorDelivery.Services
+@implements IDisposable
 
-<div class="admin-panel">
-    <div class="d-flex align-items-center mb-3 gap-2">
-        <button class="btn btn-gradient-red" @onclick="@(() => Nav.NavigateTo("/paneladmin"))">← Volver</button>
-        <h3 class="m-0">Gestión de Vendedores</h3>
+<h2 class="mb-3">Gestión de Vendedores</h2>
+
+@if (_cargando)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <div class="edit-page">
+        <h5 class="mt-2">Crear Nuevo Vendedor</h5>
+        <div class="d-flex flex-column gap-2">
+            <button class="btn btn-gradient-orange btn-full" @onclick="AbrirModalCrear">+ Nuevo vendedor</button>
+        </div>
     </div>
 
-    @if (_cargando)
+    <hr class="my-4" />
+
+    <h5 class="mb-2">Vendedores actuales</h5>
+
+    @if (_vendedores.Count == 0)
     {
-        <div class="text-center py-4"><span>Cargando...</span></div>
+        <div class="alert alert-info">No hay vendedores registrados.</div>
     }
     else
     {
-        <div class="mb-3">
-            <button class="btn btn-gradient-green" @onclick="AbrirModalCrear">+ Nuevo vendedor</button>
-        </div>
-
-        @if (_vendedores.Count == 0)
+        @foreach (var v in _vendedores)
         {
-            <p class="text-muted">No hay vendedores registrados.</p>
-        }
-        else
-        {
-            @foreach (var v in _vendedores)
-            {
-                <div class="gp-card">
-                    <div class="gp-card-head">
-                        <strong>@v.NombreUsuario</strong>
-                        <span class="@(v.Activo ? "chip-entregado" : "chip-pendiente")">@(v.Activo ? "Activo" : "Inactivo")</span>
+            <div class="gp-card">
+                <div class="gp-card-body" style="padding-top:10px">
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Usuario</span>
+                        <span>@v.NombreUsuario</span>
                     </div>
-                    <div class="gp-card-body">
-                        <div class="gp-row"><span class="gp-label">Nombre</span><span>@v.Nombre @v.Apellido</span></div>
-                        <div class="gp-row"><span class="gp-label">Alta</span><span>@v.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy")</span></div>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Nombre</span>
+                        <span>@v.Nombre @v.Apellido</span>
                     </div>
-                    <div class="gp-card-actions">
-                        <button class="btn btn-edit-orange gp-btn" @onclick="@(() => AbrirModalEditar(v))">Editar</button>
-                        <button class="btn btn-gradient-red gp-btn" @onclick="@(() => AbrirModalEliminar(v))">Eliminar</button>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Alta</span>
+                        <span>@v.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                    </div>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Estado</span>
+                        <span class="chip @(v.Activo ? "chip-entregado" : "chip-cancelado")">@(v.Activo ? "Activo" : "Inactivo")</span>
                     </div>
                 </div>
-            }
+                <div class="gp-card-actions">
+                    <button class="btn btn-edit-orange gp-btn" @onclick="@(() => AbrirModalEditar(v))">Editar</button>
+                    <button class="btn btn-gradient-red gp-btn" @onclick="@(() => AbrirModalEliminar(v))">Eliminar</button>
+                </div>
+            </div>
         }
     }
-</div>
+
+    <div class="catalog-footer-actions footer-safe-pad">
+        <button class="btn btn-gradient-orange btn-full" @onclick="VolverPanel">
+            Volver al panel de administrador
+        </button>
+        <button class="btn btn-gradient-red btn-full" @onclick="CerrarSesion">
+            Cerrar sesión
+        </button>
+    </div>
+}
 
 @* Modal Crear/Editar *@
 @if (_modalAbierto)
@@ -286,4 +308,7 @@
         _toastTimer.Start();
     }
     private void CerrarToast() { _mostrarToast = false; _toastTimer?.Stop(); }
+    private void VolverPanel() => Nav.NavigateTo("/paneladmin");
+    private void CerrarSesion() { Auth.Logout(); Nav.NavigateTo("/login", true); }
+    public void Dispose() { _toastTimer?.Stop(); _toastTimer?.Dispose(); }
 }

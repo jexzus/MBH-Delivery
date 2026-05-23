@@ -189,9 +189,9 @@
             {
                 <div class="product-card">
                     <div class="product-img">
-                        <img src="@(!string.IsNullOrWhiteSpace(p.ImagenUrl) ? p.ImagenUrl : "/images/no-image.png")"
+                        <img src="@p.ImagenUrl"
                              alt="@p.Nombre"
-                             onerror="this.onerror=null;this.src='/images/no-image.png'" />
+                             onerror="this.onerror=null;this.style.visibility='hidden'" />
                     </div>
 
                     <div class="product-body">

@@ -12,28 +12,9 @@ namespace MauiBlazorDelivery.Services
 
         public async Task<UsuarioLogin?> LoginAsync(string username, string password)
         {
-            if (MauiProgram.DemoMode)
-            {
-                await Task.Delay(500);
-                if (username == "admin" && password == "admin")
-                {
-                    UsuarioActual = new UsuarioLogin { IdUsuario = 1, NombreUsuario = "admin", Rol = "admin" };
-                    return UsuarioActual;
-                }
-                if (username == "cliente" && password == "cliente")
-                {
-                    UsuarioActual = new UsuarioLogin { IdUsuario = 2, NombreUsuario = "cliente", Rol = "cliente" };
-                    return UsuarioActual;
-                }
-                return null;
-            }
-
-            var request = new { NombreUsuario = username, Contraseña = password };
+                var request = new { NombreUsuario = username, Contraseña = password };
             var response = await _http.PostAsJsonAsync("api/usuarios/login", request);
             if (!response.IsSuccessStatusCode) return null;
-
-            var contenido = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"[DEBUG AuthService] Login → {contenido}");
 
             UsuarioActual = await response.Content.ReadFromJsonAsync<UsuarioLogin>();
             return UsuarioActual;

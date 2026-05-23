@@ -42,6 +42,7 @@ else
                         <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.EnReparto))">En reparto</button></li>
                         <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Entregado))">Entregado</button></li>
                         <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Cancelado))">Cancelado</button></li>
+                        <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Activos))">Activos</button></li>
                         <li><button class="dropdownish-item" @onclick="@(() => CambiarFiltro(EstadoFiltro.Todos))">Todos</button></li>
                     </ul>
                 }
@@ -244,8 +245,8 @@ else
     private bool _cargando = true;
     private int? _solicitando;
 
-    private enum EstadoFiltro { Pendiente, EnPreparacion, EsperandoRepartidor, EnReparto, Entregado, Cancelado, Todos }
-    private EstadoFiltro _filtro = EstadoFiltro.Todos;
+    private enum EstadoFiltro { Pendiente, EnPreparacion, EsperandoRepartidor, EnReparto, Entregado, Cancelado, Activos, Todos }
+    private EstadoFiltro _filtro = EstadoFiltro.Activos;
     private bool _filtroMenuAbierto;
     private string _buscar = "";
 
@@ -257,6 +258,7 @@ else
         EstadoFiltro.EnReparto           => "En reparto",
         EstadoFiltro.Entregado           => "Entregado",
         EstadoFiltro.Cancelado           => "Cancelado",
+        EstadoFiltro.Activos             => "Activos",
         _                                => "Todos"
     };
 
@@ -322,6 +324,8 @@ else
         SignalR.EstadoCambiadoGlobal  -= OnEstadoCambiado;
         SignalR.PedidoAceptado        -= OnPedidoAceptado;
         SignalR.AlertaPedidoIgnorada  -= OnAlertaIgnorada;
+        _toastTimer?.Stop();
+        _toastTimer?.Dispose();
     }
 
     private async Task CargarAsync()
@@ -357,6 +361,8 @@ else
         EstadoFiltro.EnReparto           => p.EstadoPedido.Equals(EST_REP,     StringComparison.OrdinalIgnoreCase),
         EstadoFiltro.Entregado           => p.EstadoPedido.Equals(EST_ENT,     StringComparison.OrdinalIgnoreCase),
         EstadoFiltro.Cancelado           => p.EstadoPedido.Equals(EST_CANCEL,  StringComparison.OrdinalIgnoreCase),
+        EstadoFiltro.Activos             => !p.EstadoPedido.Equals(EST_ENT,    StringComparison.OrdinalIgnoreCase)
+                                         && !p.EstadoPedido.Equals(EST_CANCEL, StringComparison.OrdinalIgnoreCase),
         _                                => true
     };
 

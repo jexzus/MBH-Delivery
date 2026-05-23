@@ -5,14 +5,12 @@ namespace MauiBlazorDelivery.Services
     public class ClienteService
     {
         private readonly HttpClient _http;
-        public ClienteService(HttpClient http) => _http = http;
+        private readonly ImagenCacheService _imagenCache;
 
-        // ---- Helper para armar URL completa de imágenes ----
-        private static string? BuildImageUrl(HttpClient http, string? img)
+        public ClienteService(HttpClient http, ImagenCacheService imagenCache)
         {
-            if (string.IsNullOrWhiteSpace(img)) return null;
-            var baseAddr = http.BaseAddress ?? new Uri("http://localhost/");
-            return new Uri(baseAddr, $"imagenes/{img}").ToString();
+            _http = http;
+            _imagenCache = imagenCache;
         }
 
         // ==================== DTOs expuestos a la UI ====================
@@ -83,14 +81,15 @@ namespace MauiBlazorDelivery.Services
             try
             {
                 var raw = await _http.GetFromJsonAsync<List<ProductoApi>>("api/cliente/catalogo") ?? new();
-                return raw.Select(p => new ProductoDto
+                var tasks = raw.Select(async p => new ProductoDto
                 {
                     IdProducto = p.IdProducto,
                     NombreProducto = p.NombreProducto,
                     Descripcion = p.Descripcion,
                     Precio = p.Precio,
-                    ImagenUrl = BuildImageUrl(_http, p.Imagen)
-                }).ToList();
+                    ImagenUrl = await _imagenCache.GetDataUrlAsync(p.Imagen)
+                });
+                return (await Task.WhenAll(tasks)).ToList();
             }
             catch (Exception ex)
             {
@@ -104,7 +103,7 @@ namespace MauiBlazorDelivery.Services
             try
             {
                 var raw = await _http.GetFromJsonAsync<List<DetalleApi>>($"api/cliente/carrito?idUsuario={idUsuario}") ?? new();
-                return raw.Select(d => new CarritoItemDto
+                var tasks = raw.Select(async d => new CarritoItemDto
                 {
                     IdProducto = d.IdProducto,
                     Cantidad = d.Cantidad,
@@ -115,9 +114,10 @@ namespace MauiBlazorDelivery.Services
                         NombreProducto = d.IdProductoNavigation.NombreProducto,
                         Descripcion = d.IdProductoNavigation.Descripcion,
                         Precio = d.IdProductoNavigation.Precio,
-                        ImagenUrl = BuildImageUrl(_http, d.IdProductoNavigation.Imagen)
+                        ImagenUrl = await _imagenCache.GetDataUrlAsync(d.IdProductoNavigation.Imagen)
                     }
-                }).ToList();
+                });
+                return (await Task.WhenAll(tasks)).ToList();
             }
             catch (Exception ex)
             {
@@ -214,15 +214,9 @@ namespace MauiBlazorDelivery.Services
 
                 var raw = await resp.Content.ReadFromJsonAsync<List<PedidoApi>>() ?? new();
 
-                return raw.Select(p => new PedidoDto
+                var pedidoTasks = raw.Select(async p =>
                 {
-                    NumPedido = p.NumPedido,
-                    FechaPedido = p.FechaPedido,
-                    EstadoPedido = p.EstadoPedido ?? "Pendiente",
-                    ModoEntrega = p.ModoEntrega,
-                    MontoTotal = p.MontoTotal,
-                    Observaciones = p.Observaciones,
-                    DetallePedidos = p.DetallePedidos.Select(d => new CarritoItemDto
+                    var detalleTasks = p.DetallePedidos.Select(async d => new CarritoItemDto
                     {
                         IdProducto = d.IdProducto,
                         Cantidad = d.Cantidad,
@@ -233,14 +227,25 @@ namespace MauiBlazorDelivery.Services
                             NombreProducto = d.IdProductoNavigation.NombreProducto,
                             Descripcion = d.IdProductoNavigation.Descripcion,
                             Precio = d.IdProductoNavigation.Precio,
-                            ImagenUrl = BuildImageUrl(_http, d.IdProductoNavigation.Imagen)
+                            ImagenUrl = await _imagenCache.GetDataUrlAsync(d.IdProductoNavigation.Imagen)
                         }
-                    }).ToList()
-                })
-                // primero no entregados; dentro de cada grupo, más recientes primero
-                .OrderBy(p => p.EstadoPedido.Equals("Entregado", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
-                .ThenByDescending(p => p.FechaPedido)
-                .ToList();
+                    });
+                    return new PedidoDto
+                    {
+                        NumPedido = p.NumPedido,
+                        FechaPedido = p.FechaPedido,
+                        EstadoPedido = p.EstadoPedido ?? "Pendiente",
+                        ModoEntrega = p.ModoEntrega,
+                        MontoTotal = p.MontoTotal,
+                        Observaciones = p.Observaciones,
+                        DetallePedidos = (await Task.WhenAll(detalleTasks)).ToList()
+                    };
+                });
+                return (await Task.WhenAll(pedidoTasks))
+                    // primero no entregados; dentro de cada grupo, más recientes primero
+                    .OrderBy(p => p.EstadoPedido.Equals("Entregado", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    .ThenByDescending(p => p.FechaPedido)
+                    .ToList();
             }
             catch (Exception ex)
             {

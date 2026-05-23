@@ -4,58 +4,80 @@
 @inject MauiBlazorDelivery.Services.RepartidorService RepartidorSvc
 @inject MauiBlazorDelivery.Services.AdminService AdminSvc
 @using MauiBlazorDelivery.Services
+@implements IDisposable
 
-<div class="admin-panel">
-    <div class="d-flex align-items-center mb-3 gap-2">
-        <button class="btn btn-gradient-red" @onclick="@(() => Nav.NavigateTo("/paneladmin"))">← Volver</button>
-        <h3 class="m-0">Gestión de Repartidores</h3>
+<h2 class="mb-3">Gestión de Repartidores</h2>
+
+@if (_cargando)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <div class="edit-page">
+        <h5 class="mt-2">Crear Nuevo Repartidor</h5>
+        <div class="d-flex flex-column gap-2">
+            <button class="btn btn-gradient-orange btn-full" @onclick="AbrirModalCrear">+ Nuevo repartidor</button>
+        </div>
     </div>
 
-    @if (_cargando)
+    <hr class="my-4" />
+
+    <h5 class="mb-2">Repartidores actuales</h5>
+
+    @if (_repartidores.Count == 0)
     {
-        <div class="text-center py-4"><span>Cargando...</span></div>
+        <div class="alert alert-info">No hay repartidores registrados.</div>
     }
     else
     {
-        <div class="mb-3">
-            <button class="btn btn-gradient-green" @onclick="AbrirModalCrear">+ Nuevo repartidor</button>
-        </div>
-
-        @if (_repartidores.Count == 0)
+        @foreach (var r in _repartidores)
         {
-            <p class="text-muted">No hay repartidores registrados.</p>
-        }
-        else
-        {
-            @foreach (var r in _repartidores)
-            {
-                <div class="gp-card">
-                    <div class="gp-card-head">
-                        <strong>@r.NombreUsuario</strong>
-                        <span class="@(r.Activo ? "chip-entregado" : "chip-pendiente")">@(r.Activo ? "Activo" : "Inactivo")</span>
+            <div class="gp-card">
+                <div class="gp-card-body" style="padding-top:10px">
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Usuario</span>
+                        <span>@r.NombreUsuario</span>
                     </div>
-                    <div class="gp-card-body">
-                        <div class="gp-row"><span class="gp-label">Nombre</span><span>@r.Nombre @r.Apellido</span></div>
-                        <div class="gp-row"><span class="gp-label">Alta</span><span>@r.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy")</span></div>
-                        <div class="gp-row align-items-center">
-                            <span class="gp-label">Dispon.</span>
-                            <select class="form-select form-select-sm" style="max-width:160px" value="@r.Disponibilidad"
-                                    @onchange="@(e => CambiarDisponibilidad(r, e.Value?.ToString()))">
-                                <option value="Activo">Activo</option>
-                                <option value="Ocupado">Ocupado</option>
-                                <option value="Inactivo">Inactivo</option>
-                            </select>
-                        </div>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Nombre</span>
+                        <span>@r.Nombre @r.Apellido</span>
                     </div>
-                    <div class="gp-card-actions">
-                        <button class="btn btn-edit-orange gp-btn" @onclick="@(() => AbrirModalEditar(r))">Editar</button>
-                        <button class="btn btn-gradient-red gp-btn" @onclick="@(() => AbrirModalEliminar(r))">Eliminar</button>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Alta</span>
+                        <span>@r.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                    </div>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Estado</span>
+                        <span class="chip @(r.Activo ? "chip-entregado" : "chip-cancelado")">@(r.Activo ? "Activo" : "Inactivo")</span>
+                    </div>
+                    <div class="gp-row align-items-center">
+                        <span class="gp-label">Dispon.</span>
+                        <select class="form-select form-select-sm" style="max-width:160px" value="@r.Disponibilidad"
+                                @onchange="@(e => CambiarDisponibilidad(r, e.Value?.ToString()))">
+                            <option value="Activo">Activo</option>
+                            <option value="Ocupado">Ocupado</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
                     </div>
                 </div>
-            }
+                <div class="gp-card-actions">
+                    <button class="btn btn-edit-orange gp-btn" @onclick="@(() => AbrirModalEditar(r))">Editar</button>
+                    <button class="btn btn-gradient-red gp-btn" @onclick="@(() => AbrirModalEliminar(r))">Eliminar</button>
+                </div>
+            </div>
         }
     }
-</div>
+
+    <div class="catalog-footer-actions footer-safe-pad">
+        <button class="btn btn-gradient-orange btn-full" @onclick="VolverPanel">
+            Volver al panel de administrador
+        </button>
+        <button class="btn btn-gradient-red btn-full" @onclick="CerrarSesion">
+            Cerrar sesión
+        </button>
+    </div>
+}
 
 @* Modal Crear/Editar *@
 @if (_modalAbierto)
@@ -307,4 +329,7 @@
         _toastTimer.Start();
     }
     private void CerrarToast() { _mostrarToast = false; _toastTimer?.Stop(); }
+    private void VolverPanel() => Nav.NavigateTo("/paneladmin");
+    private void CerrarSesion() { Auth.Logout(); Nav.NavigateTo("/login", true); }
+    public void Dispose() { _toastTimer?.Stop(); _toastTimer?.Dispose(); }
 }

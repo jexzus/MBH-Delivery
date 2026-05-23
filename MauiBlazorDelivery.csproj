@@ -13,7 +13,7 @@
 		<Nullable>enable</Nullable>
 
 		<!-- App -->
-		<ApplicationTitle>MauiBlazorDelivery</ApplicationTitle>
+		<ApplicationTitle>JamBurgers</ApplicationTitle>
 		<ApplicationId>com.companyname.mauiblazordelivery</ApplicationId>
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>

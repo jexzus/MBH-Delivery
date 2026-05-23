@@ -3,6 +3,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject ClienteService ClienteSvc
+@implements IDisposable
 
 <h2 class="mb-2 page-title">Catálogo</h2>
 
@@ -27,10 +28,10 @@ else
         {
             <div class="product-card">
                 <div class="product-img">
-                    <img src="@(string.IsNullOrWhiteSpace(p.ImagenUrl) ? "/images/no-image.png" : p.ImagenUrl)"
+                    <img src="@p.ImagenUrl"
                          alt="@p.NombreProducto"
                          loading="lazy"
-                         onerror="this.onerror=null;this.src='/images/no-image.png'" />
+                         onerror="this.onerror=null;this.style.visibility='hidden'" />
                 </div>
 
                 <div class="product-body">
@@ -83,7 +84,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Auth.EstaLogueado || Auth.EsAdmin)
+        if (!Auth.EstaLogueado || !Auth.EsCliente)
         {
             Nav.NavigateTo("/login");
             return;
@@ -155,5 +156,11 @@ else
         _mostrarToast = false;
         _toastTimer?.Stop();
         StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _toastTimer?.Stop();
+        _toastTimer?.Dispose();
     }
 }

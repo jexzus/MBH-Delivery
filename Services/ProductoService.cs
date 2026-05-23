@@ -9,37 +9,30 @@ namespace MauiBlazorDelivery.Services
     public class ProductoService
     {
         private readonly HttpClient _httpClient;
+        private readonly ImagenCacheService _imagenCache;
 
-        // ──> Inyectamos SOLO HttpClient con BaseAddress ya configurada en MauiProgram
-        public ProductoService(HttpClient httpClient)
+        public ProductoService(HttpClient httpClient, ImagenCacheService imagenCache)
         {
             _httpClient = httpClient;
-        }
-
-        private static string ImgUrl(HttpClient http, string? img)
-        {
-            if (string.IsNullOrWhiteSpace(img)) return "/images/no-image.png";
-            var baseUrl = http.BaseAddress?.ToString().TrimEnd('/') ?? "";
-            // Evita barras dobles y escapa el nombre de archivo
-            return $"{baseUrl}/imagenes/{Uri.EscapeDataString(img)}";
+            _imagenCache = imagenCache;
         }
 
         public async Task<List<ProductoDto>> GetTodosAsync()
         {
             try
             {
-                // Ajustá "api/Producto" si tu controller usa otro [Route]
                 var productos = await _httpClient.GetFromJsonAsync<List<ProductoFromApi>>("api/Producto")
                                ?? new List<ProductoFromApi>();
 
-                return productos.Select(p => new ProductoDto
+                var tasks = productos.Select(async p => new ProductoDto
                 {
                     Id = p.IdProducto,
                     Nombre = p.NombreProducto,
                     Descripcion = p.Descripcion,
                     Precio = p.Precio ?? 0,
-                    ImagenUrl = string.IsNullOrEmpty(p.Imagen) ? null : ImgUrl(_httpClient, p.Imagen!)
-                }).ToList();
+                    ImagenUrl = await _imagenCache.GetDataUrlAsync(p.Imagen)
+                });
+                return (await Task.WhenAll(tasks)).ToList();
             }
             catch (Exception ex)
             {
@@ -53,13 +46,14 @@ namespace MauiBlazorDelivery.Services
             try
             {
                 var p = await _httpClient.GetFromJsonAsync<ProductoFromApi>($"api/Producto/{id}");
-                return p == null ? null : new ProductoDto
+                if (p == null) return null;
+                return new ProductoDto
                 {
                     Id = p.IdProducto,
                     Nombre = p.NombreProducto,
                     Descripcion = p.Descripcion,
                     Precio = p.Precio ?? 0,
-                    ImagenUrl = string.IsNullOrEmpty(p.Imagen) ? null : ImgUrl(_httpClient, p.Imagen!)
+                    ImagenUrl = await _imagenCache.GetDataUrlAsync(p.Imagen)
                 };
             }
             catch (Exception ex)
