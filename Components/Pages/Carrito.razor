@@ -3,6 +3,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject ClienteService ClienteSvc
+@implements IDisposable
 
 <h2 class="mb-3">Carrito de Compras</h2>
 
@@ -112,18 +113,31 @@ else
     </div>
 }
 
-@* ---------- Modal: confirmar PEDIDO ---------- *@
+@* ---------- Modal: elegir forma de pago ---------- *@
 @if (_confirmarPedidoAbierto)
 {
     <div class="modal-backdrop-custom" @onclick="CerrarConfirmPedido"></div>
     <div class="modal-custom" role="dialog" @onclick:stopPropagation="true">
         <div class="modal-header">
-            <h5 class="modal-title">Confirmar pedido</h5>
+            <h5 class="modal-title">¿Cómo querés pagar?</h5>
         </div>
         <div class="modal-body">
-            Vas a confirmar tu pedido por un total de <strong>$ @_total.ToString("N0")</strong>.
-            <br />
-            Tipo de entrega: <strong>@_tipoEntrega</strong>.
+            <p class="mb-3">
+                Total: <strong>$ @_total.ToString("N0")</strong> &nbsp;·&nbsp;
+                Entrega: <strong>@_tipoEntrega</strong>
+            </p>
+            <div class="d-flex flex-column gap-2">
+                <button class="btn btn-gradient-orange btn-full" @onclick="PagarEfectivoAsync" disabled="@_trabajando">
+                    💵 Pagar en Efectivo
+                </button>
+                <button class="btn btn-grad-confirmar btn-full" style="border-radius:12px" @onclick="PagarMercadoPagoAsync" disabled="@_trabajando">
+                    💳 Pagar con MercadoPago
+                </button>
+            </div>
+            @if (_trabajando)
+            {
+                <div class="text-center mt-3 text-muted">@_mensajePago</div>
+            }
             @if (!string.IsNullOrEmpty(_errorPedido))
             {
                 <div class="alert alert-danger mt-2">@_errorPedido</div>
@@ -131,10 +145,7 @@ else
         </div>
         <div class="modal-footer">
             <button class="btn btn-pill btn-grad-cancelar-modal" @onclick="CerrarConfirmPedido" disabled="@_trabajando">
-                No, cancelar
-            </button>
-            <button class="btn btn-pill btn-grad-confirmar" @onclick="ConfirmarPedidoAsync" disabled="@_trabajando">
-                @(_trabajando ? "Enviando..." : "Sí, confirmar")
+                Cancelar
             </button>
         </div>
     </div>
@@ -172,6 +183,7 @@ else
 
     // estado general
     private bool _trabajando;
+    private string _mensajePago = "";
     private bool _mostrarToast;
     private string _toastText = "OK";
     private System.Timers.Timer? _toastTimer;
@@ -249,27 +261,65 @@ else
         _confirmarPedidoAbierto = false;
         _errorPedido = null;
         _trabajando = false;
+        _mensajePago = "";
     }
 
-    private async Task ConfirmarPedidoAsync()
+    private async Task PagarEfectivoAsync()
     {
         _trabajando = true;
+        _mensajePago = "Confirmando pedido...";
+        _errorPedido = null;
 
-        var ok = await ClienteSvc.ConfirmarPedidoAsync(Auth.IdUsuario, _observaciones, _tipoEntrega);
+        var numPedido = await ClienteSvc.ConfirmarPedidoAsync(Auth.IdUsuario, _observaciones, _tipoEntrega, "efectivo");
         _trabajando = false;
 
-        if (ok)
+        if (numPedido is not null)
         {
             CerrarConfirmPedido();
-            MostrarToast("¡Pedido confirmado correctamente!");
-            // recargar (debería venir carrito vacío)
+            MostrarToast("¡Pedido confirmado! Te esperamos para el pago en efectivo.");
             await CargarAsync();
         }
         else
         {
-            _errorPedido = "No se pudo confirmar el pedido.";
+            _errorPedido = "No se pudo confirmar el pedido. Intentá de nuevo.";
             StateHasChanged();
         }
+    }
+
+    private async Task PagarMercadoPagoAsync()
+    {
+        _trabajando = true;
+        _mensajePago = "Preparando MercadoPago...";
+        _errorPedido = null;
+        StateHasChanged();
+
+        var numPedido = await ClienteSvc.ConfirmarPedidoAsync(Auth.IdUsuario, _observaciones, _tipoEntrega, "mercadopago");
+        if (numPedido is null)
+        {
+            _trabajando = false;
+            _errorPedido = "No se pudo confirmar el pedido. Intentá de nuevo.";
+            StateHasChanged();
+            return;
+        }
+
+        _mensajePago = "Abriendo MercadoPago...";
+        StateHasChanged();
+
+        var (url, mpError) = await ClienteSvc.CrearPreferenciaMpAsync(numPedido.Value);
+        _trabajando = false;
+
+        if (string.IsNullOrEmpty(url))
+        {
+            _errorPedido = $"Error MP: {mpError}";
+            StateHasChanged();
+            return;
+        }
+
+        CerrarConfirmPedido();
+        MostrarToast("Abriendo MercadoPago en el navegador...");
+        await CargarAsync();
+
+        await Microsoft.Maui.ApplicationModel.Launcher.OpenAsync(new Uri(url));
     }
 
     // ---------- navegación / toast / sesión ----------
@@ -302,4 +352,6 @@ else
         _toastTimer?.Stop();
         StateHasChanged();
     }
+
+    public void Dispose() { _toastTimer?.Stop(); _toastTimer?.Dispose(); }
 }

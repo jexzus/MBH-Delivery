@@ -410,7 +410,7 @@ else
         _marcando = p.NumPedido;
         try
         {
-            var ok = await PedidosSvc.CambiarEstadoAsync(p.NumPedido, "Entregado");
+            var (ok, _) = await PedidosSvc.CambiarEstadoAsync(p.NumPedido, "Entregado");
             if (ok)
             {
                 _pedidosEnReparto.Remove(p);

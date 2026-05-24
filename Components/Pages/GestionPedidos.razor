@@ -159,6 +159,29 @@ else
                 <div class="mb-1"><strong>Tel:</strong> @_detalleActual.Cliente?.NumTelefono</div>
                 <div class="mb-1"><strong>Domicilio:</strong> @_detalleActual.Cliente?.Domicilio</div>
                 <div class="mb-1"><strong>Entrega:</strong> @(_detalleActual.ModoEntrega ?? "-")</div>
+                <div class="mb-1">
+                    <strong>Pago:</strong>
+                    @if (string.Equals(_detalleActual.FormaPago, "mercadopago", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <span> MercadoPago </span>
+                        @if (_detalleActual.EstadoPago == "aprobado")
+                        {
+                            <span class="badge bg-success">Confirmado</span>
+                        }
+                        else if (_detalleActual.EstadoPago == "rechazado")
+                        {
+                            <span class="badge bg-danger">Rechazado</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Pendiente</span>
+                        }
+                    }
+                    else
+                    {
+                        <span> Efectivo</span>
+                    }
+                </div>
                 <div class="mb-1"><strong>Fecha:</strong> @_detalleActual.FechaPedido.ToString("dd/MM/yyyy HH:mm")</div>
                 @if (!string.IsNullOrWhiteSpace(_detalleActual.Observaciones))
                 {
@@ -282,6 +305,7 @@ else
             SignalR.EstadoCambiadoGlobal  += OnEstadoCambiado;
             SignalR.PedidoAceptado        += OnPedidoAceptado;
             SignalR.AlertaPedidoIgnorada  += OnAlertaIgnorada;
+            SignalR.PagoActualizado       += OnPagoActualizado;
 
             await CargarAsync();
         }
@@ -319,11 +343,20 @@ else
         InvokeAsync(() => { MostrarToast(alerta.Mensaje); });
     }
 
+    private void OnPagoActualizado(int numPedido, string estadoPago)
+    {
+        var p = _pedidos.FirstOrDefault(x => x.NumPedido == numPedido);
+        if (p is not null) p.EstadoPago = estadoPago;
+        var etiqueta = estadoPago == "aprobado" ? "aprobado ✓" : estadoPago == "rechazado" ? "rechazado ✗" : estadoPago;
+        InvokeAsync(() => { MostrarToast($"Pedido #{numPedido}: pago {etiqueta}"); StateHasChanged(); });
+    }
+
     public void Dispose()
     {
         SignalR.EstadoCambiadoGlobal  -= OnEstadoCambiado;
         SignalR.PedidoAceptado        -= OnPedidoAceptado;
         SignalR.AlertaPedidoIgnorada  -= OnAlertaIgnorada;
+        SignalR.PagoActualizado       -= OnPagoActualizado;
         _toastTimer?.Stop();
         _toastTimer?.Dispose();
     }
@@ -427,8 +460,8 @@ else
         if (_confirmarEstadoPara is null) return;
         try
         {
-            var ok = await PedidosSvc.CambiarEstadoAsync(_confirmarEstadoPara.NumPedido, _nuevoEstadoDeseado);
-            if (!ok) { _errorEstado = "No se pudo actualizar el estado."; StateHasChanged(); return; }
+            var (ok, errorMsg) = await PedidosSvc.CambiarEstadoAsync(_confirmarEstadoPara.NumPedido, _nuevoEstadoDeseado);
+            if (!ok) { _errorEstado = errorMsg ?? "No se pudo actualizar el estado."; StateHasChanged(); return; }
             var p = _pedidos.FirstOrDefault(x => x.NumPedido == _confirmarEstadoPara.NumPedido);
             if (p is not null) p.EstadoPedido = _nuevoEstadoDeseado;
             CerrarConfirmEstado();

@@ -40,6 +40,8 @@ namespace MauiBlazorDelivery.Services
             public string? ModoEntrega { get; set; }
             public decimal MontoTotal { get; set; }
             public string? Observaciones { get; set; }
+            public string? FormaPago { get; set; }
+            public string EstadoPago { get; set; } = "pendiente";
             public List<CarritoItemDto> DetallePedidos { get; set; } = new();
         }
 
@@ -71,6 +73,8 @@ namespace MauiBlazorDelivery.Services
             public string? ModoEntrega { get; set; }
             public decimal MontoTotal { get; set; }
             public string? Observaciones { get; set; }
+            public string? FormaPago { get; set; }
+            public string? EstadoPago { get; set; }
             public List<DetalleApi> DetallePedidos { get; set; } = new();
         }
 
@@ -163,7 +167,8 @@ namespace MauiBlazorDelivery.Services
             }
         }
 
-        public async Task<bool> ConfirmarPedidoAsync(int idUsuario, string observaciones, string? modoEntrega = null)
+        // Devuelve el numPedido si OK, null si falla
+        public async Task<int?> ConfirmarPedidoAsync(int idUsuario, string observaciones, string? modoEntrega = null, string formaPago = "efectivo")
         {
             try
             {
@@ -171,14 +176,39 @@ namespace MauiBlazorDelivery.Services
                 {
                     IdUsuario = idUsuario,
                     Observaciones = observaciones,
-                    ModoEntrega = modoEntrega
+                    ModoEntrega = modoEntrega,
+                    FormaPago = formaPago
                 });
-                return resp.IsSuccessStatusCode;
+                if (!resp.IsSuccessStatusCode) return null;
+                var json = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                return json.GetProperty("numPedido").GetInt32();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // Devuelve (url, error): url != null = éxito, error != null = mensaje de falla
+        public async Task<(string? url, string? error)> CrearPreferenciaMpAsync(int numPedido)
+        {
+            try
+            {
+                var resp = await _http.PostAsJsonAsync("api/pagos/crear-preferencia", new { NumPedido = numPedido });
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var body = await resp.Content.ReadAsStringAsync();
+                    return (null, $"HTTP {(int)resp.StatusCode}: {body}");
+                }
+                var json = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                var url = json.GetProperty("sandboxInitPoint").GetString();
+                if (string.IsNullOrEmpty(url))
+                    return (null, "MercadoPago no devolvió una URL de pago.");
+                return (url, null);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ClienteService] ConfirmarPedidoAsync error: {ex.Message}");
-                return false;
+                return (null, ex.Message);
             }
         }
 
@@ -238,6 +268,8 @@ namespace MauiBlazorDelivery.Services
                         ModoEntrega = p.ModoEntrega,
                         MontoTotal = p.MontoTotal,
                         Observaciones = p.Observaciones,
+                        FormaPago = p.FormaPago,
+                        EstadoPago = p.EstadoPago ?? "pendiente",
                         DetallePedidos = (await Task.WhenAll(detalleTasks)).ToList()
                     };
                 });

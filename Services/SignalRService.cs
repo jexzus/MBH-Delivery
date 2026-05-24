@@ -18,6 +18,7 @@ public class SignalRService : IAsyncDisposable
     public event Action<int>? PedidoRevertido;
     public event Action<int>? AlertaAdminVista;
     public event Action<AlertaPedidoDto>? AlertaPedidoIgnorada;
+    public event Action<int, string>? PagoActualizado;   // numPedido, estadoPago
     public event Action? Reconectado;
 
     public bool IsConnected => _hub?.State == HubConnectionState.Connected;
@@ -142,6 +143,13 @@ public class SignalRService : IAsyncDisposable
                 Tipo = el.GetProperty("tipo").GetString() ?? ""
             };
             AlertaPedidoIgnorada?.Invoke(dto);
+        });
+
+        _hub.On<JsonElement>("PagoActualizado", el =>
+        {
+            var numPedido = el.GetProperty("numPedido").GetInt32();
+            var estadoPago = el.GetProperty("estadoPago").GetString() ?? "pendiente";
+            PagoActualizado?.Invoke(numPedido, estadoPago);
         });
     }
 

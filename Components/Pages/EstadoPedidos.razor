@@ -100,6 +100,28 @@ else
                             <span class="@ChipClass(p.EstadoPedido)">@EtiquetaEstado(p.EstadoPedido)</span>
                         </div>
 
+                        <div class="mt-1 text-center small">
+                            @if (string.Equals(p.FormaPago, "mercadopago", StringComparison.OrdinalIgnoreCase))
+                            {
+                                @if (p.EstadoPago == "aprobado")
+                                {
+                                    <span class="badge bg-success">MercadoPago — Pagado</span>
+                                }
+                                else if (p.EstadoPago == "rechazado")
+                                {
+                                    <span class="badge bg-danger">MercadoPago — Rechazado</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">MercadoPago — Pago pendiente</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Efectivo</span>
+                            }
+                        </div>
+
                         @if (p.EstadoPedido == "Pendiente")
                         {
                             <div class="mt-3 text-center">

@@ -18,6 +18,8 @@ namespace MauiBlazorDelivery.Services
             public decimal MontoTotal { get; set; }
             public string? Observaciones { get; set; }
             public string? ModoEntrega { get; set; }
+            public string? FormaPago { get; set; }
+            public string EstadoPago { get; set; } = "pendiente";
             public ClienteDto? Cliente { get; set; }
             public List<DetalleDto> DetallePedidos { get; set; } = new();
         }
@@ -59,6 +61,8 @@ namespace MauiBlazorDelivery.Services
             public decimal MontoTotal { get; set; }
             public string? Observaciones { get; set; }
             public string? ModoEntrega { get; set; }
+            public string? FormaPago { get; set; }
+            public string? EstadoPago { get; set; }
             public ClienteApi? IdClienteNavigation { get; set; }
             public List<DetalleApi> DetallePedidos { get; set; } = new();
         }
@@ -96,11 +100,13 @@ namespace MauiBlazorDelivery.Services
             return Map(raw);
         }
 
-        public async Task<bool> CambiarEstadoAsync(int numPedido, string nuevoEstado)
+        public async Task<(bool ok, string? error)> CambiarEstadoAsync(int numPedido, string nuevoEstado)
         {
             var resp = await _http.PutAsJsonAsync("api/admin/cambiar-estado",
                 new { NumPedido = numPedido, NuevoEstado = nuevoEstado });
-            return resp.IsSuccessStatusCode;
+            if (resp.IsSuccessStatusCode) return (true, null);
+            var msg = await resp.Content.ReadAsStringAsync();
+            return (false, string.IsNullOrWhiteSpace(msg) ? "No se pudo actualizar el estado." : msg.Trim('"'));
         }
 
         public async Task<bool> SolicitarRepartidorAsync(int numPedido)
@@ -181,6 +187,8 @@ namespace MauiBlazorDelivery.Services
                     MontoTotal = r.MontoTotal,
                     Observaciones = r.Observaciones,
                     ModoEntrega = r.ModoEntrega,
+                    FormaPago = r.FormaPago,
+                    EstadoPago = r.EstadoPago ?? "pendiente",
                     Cliente = r.IdClienteNavigation is null ? null : new ClienteDto
                     {
                         IdCliente = r.IdClienteNavigation.IdCliente,
