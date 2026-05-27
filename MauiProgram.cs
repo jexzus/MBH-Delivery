@@ -72,7 +72,7 @@ public static class MauiProgram
             return new HttpClientHandler();
 #endif
         });
-
+        //relaciones de dependecias
         builder.Services.AddScoped(sp =>
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
@@ -93,13 +93,16 @@ public static class MauiProgram
 
     private static string ResolveBaseUrl()
     {
-#if ANDROID
-        return "http://192.168.0.13:5224/";   // casa  ← cambiar a 192.168.4.144 en trabajo
-#elif DEBUG
-        return "https://localhost:7189/";
-#else
-        return "https://localhost:7189/";
-#endif
+        // Apuntamos directamente al servidor en la nube para la exposición
+        return "http://jamburgers.runasp.net/";
+
+        //#if ANDROID
+        //      return "http://192.168.0.13:5224/";   // casa  ← cambiar a 192.168.4.144 en trabajo
+        //#elif DEBUG
+        //      return "https://localhost:7189/";
+        //#else
+        //return "https://localhost:7189/";
+//#endif
     }
 }
 

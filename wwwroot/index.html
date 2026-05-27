@@ -17,13 +17,20 @@
     <!-- <div class="bg-overlay"></div> -->
 
     <div id="app">Cargando...</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
         window.mauiPrintHelper = {
-            printWithClass: function (cls) {
-                const prev = document.body.className;
-                document.body.classList.add(cls);
-                window.print();
-                setTimeout(() => document.body.className = prev, 0);
+            printWithClass: async function (elementId) {
+                const el = document.getElementById(elementId);
+                if (!el) return null;
+                const opt = {
+                    margin: 10,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                const dataUri = await html2pdf().set(opt).from(el).output('datauristring');
+                return dataUri;
             }
         };
     </script>

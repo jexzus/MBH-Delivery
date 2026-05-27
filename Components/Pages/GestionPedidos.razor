@@ -471,8 +471,28 @@ else
         finally { StateHasChanged(); }
     }
 
-    private async Task ImprimirLista() => await JS.InvokeVoidAsync("mauiPrintHelper.printWithClass", "print-list");
-    private async Task ImprimirDetalle() => await JS.InvokeVoidAsync("mauiPrintHelper.printWithClass", "print-detalle");
+    private async Task ImprimirLista() => await GenerarYCompartirPdf("print-list", "pedidos");
+    private async Task ImprimirDetalle() => await GenerarYCompartirPdf("print-detalle", "detalle-pedido");
+
+    private async Task GenerarYCompartirPdf(string elementId, string nombreBase)
+    {
+        try
+        {
+            var dataUri = await JS.InvokeAsync<string>("mauiPrintHelper.printWithClass", elementId);
+            if (string.IsNullOrEmpty(dataUri)) return;
+            var base64 = dataUri[(dataUri.IndexOf(',') + 1)..];
+            var bytes = Convert.FromBase64String(base64);
+            var fileName = $"{nombreBase}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            var filePath = Path.Combine(FileSystem.CacheDirectory, fileName);
+            await File.WriteAllBytesAsync(filePath, bytes);
+            await Share.RequestAsync(new ShareFileRequest
+            {
+                Title = "Exportar PDF",
+                File = new ShareFile(filePath)
+            });
+        }
+        catch (Exception ex) { MostrarToast($"Error al generar PDF: {ex.Message}"); }
+    }
 
     private void MostrarToast(string txt)
     {
