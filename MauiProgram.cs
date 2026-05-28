@@ -55,12 +55,15 @@ public static class MauiProgram
         builder.Services.AddSingleton(new MauiBlazorDelivery.Services.SignalRService(baseUrl));
         Console.WriteLine($"[DEBUG] Using base URL: {baseUrl}");
 
+        builder.Services.AddTransient<MauiBlazorDelivery.Services.AuthTokenHandler>();
+
         builder.Services.AddHttpClient("Api", c =>
         {
-            c.BaseAddress = new Uri(baseUrl);      // ¡con "/" final!
+            c.BaseAddress = new Uri(baseUrl);
             c.Timeout = TimeSpan.FromSeconds(20);
             c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         })
+        .AddHttpMessageHandler<MauiBlazorDelivery.Services.AuthTokenHandler>()
         .ConfigurePrimaryHttpMessageHandler(() =>
         {
 #if DEBUG
@@ -94,7 +97,7 @@ public static class MauiProgram
     private static string ResolveBaseUrl()
     {
         // Apuntamos directamente al servidor en la nube para la exposición
-        return "http://jamburgers.runasp.net/";
+        return "https://jamburgers.runasp.net/";
 
         //#if ANDROID
         //      return "http://192.168.0.13:5224/";   // casa  ← cambiar a 192.168.4.144 en trabajo

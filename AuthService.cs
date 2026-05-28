@@ -12,11 +12,18 @@ namespace MauiBlazorDelivery.Services
 
         public async Task<UsuarioLogin?> LoginAsync(string username, string password)
         {
-                var request = new { NombreUsuario = username, Contraseña = password };
+            var request = new { NombreUsuario = username, Contraseña = password };
             var response = await _http.PostAsJsonAsync("api/usuarios/login", request);
             if (!response.IsSuccessStatusCode) return null;
 
             UsuarioActual = await response.Content.ReadFromJsonAsync<UsuarioLogin>();
+
+            if (UsuarioActual?.Token is not null)
+            {
+                try { await SecureStorage.SetAsync("jwt_token", UsuarioActual.Token); }
+                catch { /* SecureStorage no disponible */ }
+            }
+
             return UsuarioActual;
         }
 
@@ -54,7 +61,12 @@ namespace MauiBlazorDelivery.Services
         public bool PuedeGestionarPedidos => EsAdmin || EsVendedor;
         public bool EstaLogueado => UsuarioActual is not null;
 
-        public void Logout() => UsuarioActual = null;
+        public void Logout()
+        {
+            UsuarioActual = null;
+            try { SecureStorage.Remove("jwt_token"); }
+            catch { /* SecureStorage no disponible */ }
+        }
     }
 
     public class UsuarioLogin
@@ -62,7 +74,6 @@ namespace MauiBlazorDelivery.Services
         [JsonPropertyName("idUsuario")]
         public int IdUsuario { get; set; }
 
-        // tolerancia si el backend devuelve "id"
         [JsonPropertyName("id")]
         public int IdAlternativo { get; set; }
 
@@ -71,6 +82,9 @@ namespace MauiBlazorDelivery.Services
 
         [JsonPropertyName("rol")]
         public string Rol { get; set; } = string.Empty;
+
+        [JsonPropertyName("token")]
+        public string? Token { get; set; }
     }
 
     /// DTO para registrar cliente (serializa con las claves que espera la API)
