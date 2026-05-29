@@ -909,3 +909,22 @@ body {
 /* reemplaza margin:0 */
 
 /* ====== Fin ====== */
+
+/* ====== Spinner personalizado ====== */
+.custom-spinner-wrapper {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    pointer-events: none;
+    background: transparent;
+}
+.custom-spinner-video {
+    width: 320px;
+    height: 320px;
+    object-fit: contain;
+    filter: url(#removeWhite);
+}

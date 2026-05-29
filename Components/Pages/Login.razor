@@ -6,11 +6,7 @@
 
 @if (IsLoading)
 {
-    <div class="login-page">
-        <img class="login-logo" src="/images/logo.png" alt="Jam Burgers" />
-        <p>Cargando…</p>
-        <small>Base: @_base</small>
-    </div>
+    <Spinner />
 }
 else if (!string.IsNullOrWhiteSpace(Error))
 {

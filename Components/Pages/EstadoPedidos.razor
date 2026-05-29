@@ -27,7 +27,7 @@
 @if (_cargando)
 {
     <div class="d-flex justify-content-center my-4">
-        <div class="spinner-border" role="status"><span class="visually-hidden">Cargando...</span></div>
+        <Spinner />
     </div>
 }
 else
@@ -69,7 +69,7 @@ else
                                 <div class="text-muted small">@p.FechaPedido.ToString("dd/MM/yyyy HH:mm")</div>
                             </div>
                             <div class="text-end">
-                                <strong>$ @p.MontoTotal.ToString("N2")</strong>
+                                <strong>$ @p.MontoTotal.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
                             </div>
                         </div>
 

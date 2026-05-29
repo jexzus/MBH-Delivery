@@ -19,7 +19,7 @@
 @if (_cargando)
 {
     <div class="d-flex justify-content-center my-4">
-        <div class="spinner-border" role="status"></div>
+        <Spinner />
     </div>
 }
 else
@@ -89,7 +89,7 @@ else
                         </div>
                         <div class="gp-row">
                             <span class="gp-label">Total</span>
-                            <strong>$ @p.MontoTotal.ToString("N2")</strong>
+                            <strong>$ @p.MontoTotal.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
                         </div>
                     </div>
                     <div class="gp-card-actions">
@@ -198,15 +198,15 @@ else
                                 <tr>
                                     <td>@d.Producto?.NombreProducto</td>
                                     <td>@d.Cantidad</td>
-                                    <td>$@d.PrecioUnitario.ToString("N2")</td>
-                                    <td>$@d.Subtotal.ToString("N2")</td>
+                                    <td>$@d.PrecioUnitario.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</td>
+                                    <td>$@d.Subtotal.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</td>
                                 </tr>
                             }
                         </tbody>
                         <tfoot>
                             <tr>
                                 <td colspan="3" class="text-end"><strong>Total</strong></td>
-                                <td><strong>$@_detalleActual.MontoTotal.ToString("N2")</strong></td>
+                                <td><strong>$@_detalleActual.MontoTotal.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong></td>
                             </tr>
                         </tfoot>
                     </table>
