@@ -57,11 +57,12 @@
     }
 
     private IEnumerable<ProductoDto> Filtrados =>
-        string.IsNullOrWhiteSpace(_buscar)
+        (string.IsNullOrWhiteSpace(_buscar)
             ? _productos
             : _productos.Where(p =>
                    (p.Nombre?.Contains(_buscar, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                   (p.Descripcion?.Contains(_buscar, StringComparison.OrdinalIgnoreCase) ?? false));
+                   (p.Descripcion?.Contains(_buscar, StringComparison.OrdinalIgnoreCase) ?? false)))
+        .OrderBy(p => p.Nombre);
 
     private void NuevoProducto() => Nav.NavigateTo("/nuevoproducto");
     private void VolverPanel() => Nav.NavigateTo(AuthService.EsVendedor ? "/panelvendedor" : "/paneladmin");

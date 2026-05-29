@@ -92,7 +92,9 @@ else
 
         try
         {
-            _productos = await ClienteSvc.GetCatalogoAsync();
+            _productos = (await ClienteSvc.GetCatalogoAsync())
+                .OrderBy(p => p.NombreProducto)
+                .ToList();
         }
         catch (Exception ex)
         {

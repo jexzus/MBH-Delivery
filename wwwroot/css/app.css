@@ -923,8 +923,8 @@ body {
     background: transparent;
 }
 .custom-spinner-video {
-    width: 320px;
-    height: 320px;
+    width: 200px;
+    height: 200px;
     object-fit: contain;
     filter: url(#removeWhite);
 }
